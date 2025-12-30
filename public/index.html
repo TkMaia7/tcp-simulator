@@ -13,37 +13,79 @@
             <div class="subtitle">Simulador Interativo da Camada de Transporte</div>
         </header>
 
-        <div class="network-stage">
-            
-            <div class="node" id="node-client">
-                <div class="icon">💻</div>
-                <div class="label">Cliente (Você)</div>
-                <div class="status-badge" id="status-client">CLOSED</div>
-                <div class="ip-addr">192.168.0.10</div>
+        <div class="workspace">
+            <div class="left-panel">
+                <div class="network-stage">
+                    <div class="node" id="node-client">
+                        <div class="icon">💻</div>
+                        <div class="label">Cliente (Você)</div>
+                        <div class="status-badge" id="status-client">CLOSED</div>
+                        <div class="ip-addr">Porta: 50124</div>
+                    </div>
+
+                    <div class="wire-container">
+                        <div class="wire" id="wire-line"></div>
+                        <div id="packet-layer"></div>
+                    </div>
+
+                    <div class="node" id="node-server">
+                        <div class="icon">🖥️</div>
+                        <div class="label">Servidor Remoto</div>
+                        <div class="status-badge" id="status-server">LISTENING</div>
+                        <div class="ip-addr">Porta: 80</div>
+                    </div>
+                </div>
+
+                <div class="data-section">
+                    <div class="chat-window" id="chat-window">
+                        <div class="system-msg" id="msg-aguardando">--- Canal de Dados Fechado ---</div>
+                    </div>
+                    <div class="input-area">
+                        <input type="text" id="msg-input" placeholder="Conecte para digitar..." disabled>
+                        <button id="btn-send-data" onclick="enviarMensagem()" disabled>Enviar (PUSH)</button>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="btn-handshake" onclick="iniciarHandshake()">🔄 Conectar (Handshake)</button>
+                    <button id="btn-reset" onclick="solicitarReset()" class="secondary">Resetar</button>
+                </div>
+                
+                <div class="terminal-log">
+                    <div class="terminal-header">_LOGS_DO_SISTEMA</div>
+                    <div id="mini-log" class="terminal-body">> Sistema pronto.</div>
+                </div>
             </div>
 
-            <div class="wire-container">
-                <div class="wire" id="wire-line"></div>
-                <div id="packet-layer"></div>
+            <div class="right-panel">
+                <div class="inspector-box">
+                    <h3>🔍 Inspetor de Pacotes TCP</h3>
+                    <p class="inspector-hint">Detalhes do último pacote trafegado</p>
+                    
+                    <div class="tcp-header-visual">
+                        <div class="row">
+                            <div class="field">Porta Origem: <span id="insp-sport">0</span></div>
+                            <div class="field">Porta Destino: <span id="insp-dport">0</span></div>
+                        </div>
+                        <div class="row full">
+                            Sequence Number (SEQ): <span id="insp-seq" class="highlight-val">0</span>
+                        </div>
+                        <div class="row full">
+                            Acknowledgment Number (ACK): <span id="insp-ack" class="highlight-val">0</span>
+                        </div>
+                        <div class="row flags-row">
+                            <div class="field small">HLEN: 5</div>
+                            <div class="field small">LEN: <span id="insp-len">0</span></div>
+                            <div class="field small">FLAGS: <span id="insp-flags" class="flag-text">NONE</span></div>
+                            <div class="field small">WIN: 65535</div>
+                        </div>
+                        <div class="row full payload-row">
+                            <div class="field">Dados (Payload):</div>
+                            <div class="payload-content" id="insp-payload">[Vazio]</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <div class="node" id="node-server">
-                <div class="icon">🖥️</div>
-                <div class="label">Cliente Remoto</div>
-                <div class="status-badge" id="status-server">LISTENING</div>
-                <div class="ip-addr">203.0.113.5</div>
-            </div>
-
-        </div>
-
-        <div class="controls">
-            <button id="btn-handshake" onclick="iniciarHandshake()">Iniciar Handshake (SYN)</button>
-            <button id="btn-reset" onclick="solicitarReset()" class="secondary">Resetar Sistema</button>
-        </div>
-
-        <div class="terminal-log">
-            <div class="terminal-header">_SYSTEM_LOGS</div>
-            <div id="mini-log" class="terminal-body">> Aguardando comando...</div>
         </div>
     </div>
 
