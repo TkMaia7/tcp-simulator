@@ -79,3 +79,6 @@ button:active { transform: scale(0.98); }
 .log-entry.sent { color: #d2a8ff; } /* Roxo para envio */
 .log-entry.received { color: #7ee787; } /* Verde para recebimento */
 .log-entry.system { color: #8b949e; font-style: italic; } /* Cinza para sistema */
+.status.yellow { background-color: #5c4b12; color: #e3b341; border-color: #e3b341; }
+.status.orange { background-color: #632b0a; color: #ff9b5e; border-color: #ff9b5e; }
+.status.green { background-color: #1c3d24; color: #7ee787; border-color: #7ee787; }

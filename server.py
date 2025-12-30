@@ -10,21 +10,27 @@ async def handler(websocket):
     
     try:
         async for message in websocket:
-            data = json.loads(message)
-            print(f"[RECEBIDO de {websocket.remote_address}] {data}")
             
+            data = json.loads(message)
+            
+            # Log para debug no terminal
+            print(f"[SERVIDOR] Recebido: {data}")
+            
+            # LÓGICA CORRIGIDA:
+            # Preservamos o 'type' original (SYN, ACK, etc)
+            # Preservamos o 'original_sender_id' para o cliente saber quem mandou
             msg_to_forward = {
-                "type": "ROUTED_MESSAGE",
-                "original_sender": str(websocket.remote_address),
+                "type": data.get("type"),           # <--- O IMPORTANTE ESTÁ AQUI
                 "payload": data.get("payload"),
-                "seq": data.get("seq")
+                "seq": data.get("seq"),
+                "original_sender_id": data.get("original_sender_id")
             }
             
-            
+            # Encaminhar para todos (menos para quem enviou)
             tasks = []
             for client in CONNECTED_CLIENTS:
-                if client != websocket: 
-                    print(f"Repassando para {client.remote_address}")
+                if client != websocket:
+                    print(f"Repassando para cliente remoto...")
                     tasks.append(client.send(json.dumps(msg_to_forward)))
             
             if tasks:
