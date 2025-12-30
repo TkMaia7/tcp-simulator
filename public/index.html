@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP Simulator - Lab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>TCP <span class="highlight">SIMULATOR</span></h1>
+            <div id="connection-status" class="status offline">OFFLINE</div>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="btn-connect" onclick="conectar()">Reconectar</button>
+                <button id="btn-send" onclick="enviarPacoteTeste()">Enviar Pacote (Teste)</button>
+            </div>
+
+            <div class="terminal-window">
+                <div class="terminal-header">Logs do Sistema</div>
+                <div id="log-area" class="terminal-body">
+                    <div class="log-entry system">> Inicializando interface...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

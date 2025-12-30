@@ -1,0 +1,81 @@
+/* Reset Básico */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background-color: #0d1117; /* Fundo GitHub Dark */
+    color: #c9d1d9;
+    font-family: 'Courier New', Courier, monospace; /* Fonte Monospaced */
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    width: 90%;
+    max-width: 800px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #30363d;
+    padding-bottom: 10px;
+}
+
+h1 { font-size: 1.5rem; }
+.highlight { color: #58a6ff; }
+
+/* Indicador de Status */
+.status {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+.status.offline { background-color: #3d1c1c; color: #ff7b72; border: 1px solid #ff7b72; }
+.status.online { background-color: #1c3d24; color: #7ee787; border: 1px solid #7ee787; }
+
+/* Botões */
+button {
+    background-color: #21262d;
+    color: #58a6ff;
+    border: 1px solid #30363d;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.2s;
+}
+button:hover { background-color: #30363d; }
+button:active { transform: scale(0.98); }
+
+/* Área de Logs (Terminal) */
+.terminal-window {
+    background-color: #010409;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.terminal-header {
+    background-color: #161b22;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #30363d;
+    color: #8b949e;
+}
+
+.terminal-body {
+    padding: 10px;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.log-entry { margin-bottom: 5px; font-size: 0.9rem; }
+.log-entry.sent { color: #d2a8ff; } /* Roxo para envio */
+.log-entry.received { color: #7ee787; } /* Verde para recebimento */
+.log-entry.system { color: #8b949e; font-style: italic; } /* Cinza para sistema */
