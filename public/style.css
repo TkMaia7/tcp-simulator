@@ -1,84 +1,162 @@
-/* Reset Básico */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* === ESTÉTICA CYBERPUNK / TERMINAL === */
 
 body {
     background-color: #0d1117; /* Fundo GitHub Dark */
-    color: #c9d1d9;
-    font-family: 'Courier New', Courier, monospace; /* Fonte Monospaced */
-    height: 100vh;
+    color: #c9d1d9; /* Texto Cinza Claro */
+    font-family: 'Courier New', Courier, monospace; /* Fonte Hacker */
     display: flex;
     justify-content: center;
     align-items: center;
+    height: 100vh;
+    margin: 0;
 }
 
-.container {
-    width: 90%;
-    max-width: 800px;
+.main-container {
+    background: #161b22; /* Container ligeiramente mais claro */
+    padding: 40px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    width: 850px;
+    text-align: center;
 }
 
-header {
+header { margin-bottom: 40px; }
+h1 { margin: 0; font-size: 2rem; letter-spacing: -1px; }
+.highlight { color: #58a6ff; } /* Azul Neon */
+.subtitle { color: #8b949e; font-size: 0.9rem; margin-top: 5px; }
+
+/* O Palco da Rede */
+.network-stage {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #30363d;
-    padding-bottom: 10px;
+    margin-bottom: 50px;
+    position: relative;
+    padding: 0 20px;
 }
 
-h1 { font-size: 1.5rem; }
-.highlight { color: #58a6ff; }
+/* Os Nós (Computadores) */
+.node { z-index: 2; position: relative; }
+.icon { font-size: 3.5rem; filter: drop-shadow(0 0 5px rgba(88, 166, 255, 0.3)); }
+.label { font-weight: bold; margin-top: 10px; color: #58a6ff; }
+.ip-addr { font-size: 0.7rem; color: #484f58; margin-top: 2px; }
 
-/* Indicador de Status */
-.status {
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.8rem;
-}
-.status.offline { background-color: #3d1c1c; color: #ff7b72; border: 1px solid #ff7b72; }
-.status.online { background-color: #1c3d24; color: #7ee787; border: 1px solid #7ee787; }
-
-/* Botões */
-button {
-    background-color: #21262d;
-    color: #58a6ff;
+.status-badge {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    background: #21262d;
     border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 4px;
+    transition: 0.3s;
+    font-weight: bold;
+}
+
+/* Cores de Status (Neon) */
+.status-badge.CLOSED { color: #ff7b72; border-color: #ff7b72; } /* Vermelho */
+.status-badge.SYN_SENT { color: #d29922; border-color: #d29922; box-shadow: 0 0 8px rgba(210, 153, 34, 0.2); } /* Laranja */
+.status-badge.SYN_RCVD { color: #e3b341; border-color: #e3b341; box-shadow: 0 0 8px rgba(227, 179, 65, 0.2); } /* Amarelo */
+.status-badge.ESTABLISHED { 
+    color: #3fb950; 
+    border-color: #3fb950; 
+    background-color: #0f2d18;
+    box-shadow: 0 0 15px rgba(63, 185, 80, 0.4); 
+} /* Verde Matrix */
+
+/* O Cabo (Wire) */
+.wire-container {
+    flex-grow: 1;
+    position: relative;
+    height: 60px;
+    margin: 0 30px;
+    display: flex;
+    align-items: center;
+}
+
+.wire {
+    width: 100%;
+    height: 2px;
+    background-color: #30363d; /* Cabo escuro */
+    transition: background-color 0.5s, height 0.5s;
+}
+
+/* Quando conectado, o cabo brilha */
+.wire.connected { 
+    background-color: #3fb950; 
+    height: 3px;
+    box-shadow: 0 0 10px #3fb950; 
+}
+
+/* O PACOTE (A bolinha viajante) */
+.packet {
+    position: absolute;
+    top: 18px;
+    padding: 6px 12px;
+    border-radius: 4px; /* Mais quadrado, estilo terminal */
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #0d1117; /* Texto escuro para contraste */
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    width: 90px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Cores dos Pacotes */
+.packet.SYN { background-color: #d29922; color: #fff; }
+.packet.SYN-ACK { background-color: #e3b341; color: #000; }
+.packet.ACK { background-color: #3fb950; color: #000; }
+
+/* Animações (Mantivemos a lógica, mudamos a velocidade se quiser) */
+@keyframes moveRight {
+    0% { left: 0; opacity: 1; }
+    90% { left: 90%; opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+}
+
+@keyframes moveLeft {
+    0% { left: 100%; opacity: 1; }
+    90% { left: 10%; opacity: 1; }
+    100% { left: 0; opacity: 0; }
+}
+
+.anim-right { animation: moveRight 1.5s ease-in-out forwards; }
+.anim-left { animation: moveLeft 1.5s ease-in-out forwards; }
+
+/* Controles */
+button {
+    background-color: #238636; /* Verde GitHub */
+    color: white;
+    border: 1px solid rgba(255,255,255,0.1);
     padding: 10px 20px;
-    cursor: pointer;
     font-family: inherit;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 6px;
     transition: 0.2s;
 }
-button:hover { background-color: #30363d; }
+button:hover { background-color: #2ea043; }
 button:active { transform: scale(0.98); }
 
-/* Área de Logs (Terminal) */
-.terminal-window {
+.secondary { background-color: #21262d; border-color: #30363d; color: #c9d1d9; }
+.secondary:hover { background-color: #30363d; }
+
+/* Log Terminal Style */
+.terminal-log {
+    margin-top: 30px;
     background-color: #010409;
     border: 1px solid #30363d;
     border-radius: 6px;
-    height: 400px;
-    display: flex;
-    flex-direction: column;
-}
-
-.terminal-header {
-    background-color: #161b22;
-    padding: 5px 10px;
+    text-align: left;
     font-size: 0.8rem;
+}
+.terminal-header {
+    background: #161b22;
+    padding: 5px 10px;
     border-bottom: 1px solid #30363d;
     color: #8b949e;
+    font-size: 0.7rem;
 }
-
-.terminal-body {
-    padding: 10px;
-    overflow-y: auto;
-    flex-grow: 1;
-}
-
-.log-entry { margin-bottom: 5px; font-size: 0.9rem; }
-.log-entry.sent { color: #d2a8ff; } /* Roxo para envio */
-.log-entry.received { color: #7ee787; } /* Verde para recebimento */
-.log-entry.system { color: #8b949e; font-style: italic; } /* Cinza para sistema */
-.status.yellow { background-color: #5c4b12; color: #e3b341; border-color: #e3b341; }
-.status.orange { background-color: #632b0a; color: #ff9b5e; border-color: #ff9b5e; }
-.status.green { background-color: #1c3d24; color: #7ee787; border-color: #7ee787; }
+.terminal-body { padding: 10px; color: #3fb950; }

@@ -2,31 +2,49 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TCP Simulator - Lab</title>
+    <title>TCP Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container">
+    <div class="main-container">
         <header>
             <h1>TCP <span class="highlight">SIMULATOR</span></h1>
-            <div id="connection-status" class="status offline">OFFLINE</div>
+            <div class="subtitle">Simulador Interativo da Camada de Transporte</div>
         </header>
 
-        <main>
-            <div class="controls">
-                <button id="btn-connect" onclick="iniciarHandshake()">Iniciar Conexão (Handshake)</button>
-                <button id="btn-send" onclick="enviarPacoteTeste()">Enviar Pacote (Teste)</button>
+        <div class="network-stage">
+            
+            <div class="node" id="node-client">
+                <div class="icon">💻</div>
+                <div class="label">Cliente (Você)</div>
+                <div class="status-badge" id="status-client">CLOSED</div>
+                <div class="ip-addr">192.168.0.10</div>
             </div>
 
-            <div class="terminal-window">
-                <div class="terminal-header">Logs do Sistema</div>
-                <div id="log-area" class="terminal-body">
-                    <div class="log-entry system">> Inicializando interface...</div>
-                </div>
+            <div class="wire-container">
+                <div class="wire" id="wire-line"></div>
+                <div id="packet-layer"></div>
             </div>
-        </main>
+
+            <div class="node" id="node-server">
+                <div class="icon">🖥️</div>
+                <div class="label">Cliente Remoto</div>
+                <div class="status-badge" id="status-server">LISTENING</div>
+                <div class="ip-addr">203.0.113.5</div>
+            </div>
+
+        </div>
+
+        <div class="controls">
+            <button id="btn-handshake" onclick="iniciarHandshake()">Iniciar Handshake (SYN)</button>
+            <button id="btn-reset" onclick="solicitarReset()" class="secondary">Resetar Sistema</button>
+        </div>
+
+        <div class="terminal-log">
+            <div class="terminal-header">_SYSTEM_LOGS</div>
+            <div id="mini-log" class="terminal-body">> Aguardando comando...</div>
+        </div>
     </div>
 
     <script src="script.js"></script>

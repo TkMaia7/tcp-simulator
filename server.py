@@ -13,20 +13,15 @@ async def handler(websocket):
             
             data = json.loads(message)
             
-            # Log para debug no terminal
             print(f"[SERVIDOR] Recebido: {data}")
             
-            # LÓGICA CORRIGIDA:
-            # Preservamos o 'type' original (SYN, ACK, etc)
-            # Preservamos o 'original_sender_id' para o cliente saber quem mandou
             msg_to_forward = {
-                "type": data.get("type"),           # <--- O IMPORTANTE ESTÁ AQUI
+                "type": data.get("type"), 
                 "payload": data.get("payload"),
                 "seq": data.get("seq"),
                 "original_sender_id": data.get("original_sender_id")
             }
             
-            # Encaminhar para todos (menos para quem enviou)
             tasks = []
             for client in CONNECTED_CLIENTS:
                 if client != websocket:
@@ -41,7 +36,6 @@ async def handler(websocket):
     except Exception as e:
         print(f"[ERRO] {e}")
     finally:
-        # --- 3. Limpeza ao sair ---
         CONNECTED_CLIENTS.remove(websocket)
 
 async def main():
