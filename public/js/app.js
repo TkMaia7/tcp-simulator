@@ -36,13 +36,29 @@ const inspFlags = document.getElementById("insp-flags");
 const inspPayload = document.getElementById("insp-payload");
 
 
-// --- 1. CONEXÃO INICIAL E ROTEAMENTO ---
+// --- 1. CONEXÃO INICIAL E ROTEAMENTO (CORRIGIDO PARA AWS) ---
 function conectarWS() {
-    const host = window.location.hostname || "localhost";
-    ws = new WebSocket(`ws://${host}:8000`);
+    const host = window.location.hostname;
+    let url;
+
+    // LÓGICA DE DETECÇÃO DE AMBIENTE
+    if (window.location.protocol === 'https:') {
+        // Se o site tem cadeado (HTTPS), usa WSS e a rota /ws do Nginx
+        console.log("Ambiente Seguro (AWS) detectado.");
+        url = `wss://${host}/ws`;
+    } else {
+        // Se é localhost ou HTTP normal, usa a porta 8000 direta
+        console.log("Ambiente Local detectado.");
+        // Se o host for vazio (abriu o arquivo direto), assume localhost
+        const targetHost = host || "localhost";
+        url = `ws://${targetHost}:8000`;
+    }
+
+    ws = new WebSocket(url);
 
     ws.onopen = () => {
-        lobbyMsg.innerText = "Conectado ao servidor. Pronto para criar/entrar.";
+        console.log("Conectado ao WebSocket!");
+        lobbyMsg.innerText = "Conectado ao servidor. Pronto.";
         lobbyMsg.style.color = "#3fb950";
     };
 
@@ -50,44 +66,33 @@ function conectarWS() {
         try {
             const msg = JSON.parse(event.data);
             
-            // ROTEAMENTO DE MENSAGENS DO SERVIDOR
             switch (msg.type) {
                 case "ROOM_ACCEPTED":
                     entrarNoSimulador(msg.room_id);
+                    if (msg.role === "HOST") {
+                        logSistema("Sala criada. Aguardando parceiro...");
+                        document.getElementById("display-status").innerText = "Aguardando Jogador 2...";
+                        document.getElementById("display-status").style.color = "#e3b341"; 
+                    } else {
+                        logSistema("Você entrou na sala. Conexão pronta.");
+                        notificarConexaoEstabelecida();
+                    }
                     break;
                 case "ERROR":
                     mostrarErroLobby(msg.message);
                     break;
                 case "RESET":
-                    alert("O par desconectou. A simulação será reiniciada.");
+                    alert("Reset solicitado.");
                     location.reload();
                     break;
-                case "ROOM_ACCEPTED":
-                    entrarNoSimulador(msg.room_id);
-                    // Se eu criei a sala (HOST), aviso que estou esperando
-                    if (msg.role === "HOST") {
-                        logSistema("Sala criada. Aguardando parceiro...");
-                        document.getElementById("display-status").innerText = "Aguardando Jogador 2...";
-                        document.getElementById("display-status").style.color = "#e3b341"; // Amarelo
-                    } else {
-                        // Se sou GUEST, já entrei com alguém lá
-                        logSistema("Você entrou na sala. Conexão pronta.");
-                        notificarConexaoEstabelecida();
-                    }
-                    break;
-
                 case "PEER_JOINED":
-                    // O Host recebe isso quando o Guest entra
                     logSistema("Um parceiro entrou na sala!");
                     notificarConexaoEstabelecida();
                     break;
-
                 case "PEER_LEFT":
-                    // O parceiro saiu -> Mostra o Modal
                     mostrarModalDesconexao();
                     break;
                 default:
-                    // Se não for msg de sistema, é msg do simulador TCP
                     if (msg.original_sender_id !== myId) {
                         animarRecebimento(msg);
                     }
@@ -95,12 +100,24 @@ function conectarWS() {
         } catch (e) { console.error(e); }
     };
 
-    ws.onerror = () => mostrarErroLobby("Erro: Servidor Offline.");
+    ws.onerror = (error) => {
+        console.error("Erro WebSocket:", error);
+        mostrarErroLobby("Erro de Conexão (Verifique Console)");
+    };
+    
+    ws.onclose = () => {
+        console.log("WebSocket fechado.");
+    };
 }
 
 // --- 2. FUNÇÕES DO LOBBY ---
 
 function criarSala() {
+    if(!ws || ws.readyState !== WebSocket.OPEN) {
+        mostrarErroLobby("Sem conexão com o servidor.");
+        return;
+    }
+    
     const nome = roomNameInput.value.trim();
     const senha = roomPassInput.value.trim();
     if (!nome || !senha) return mostrarErroLobby("Preencha nome e senha.");
@@ -113,6 +130,11 @@ function criarSala() {
 }
 
 function entrarSala() {
+    if(!ws || ws.readyState !== WebSocket.OPEN) {
+        mostrarErroLobby("Sem conexão com o servidor.");
+        return;
+    }
+
     const nome = roomNameInput.value.trim();
     const senha = roomPassInput.value.trim();
     if (!nome || !senha) return mostrarErroLobby("Preencha nome e senha.");
@@ -139,14 +161,12 @@ function entrarNoSimulador(salaId) {
 
 // --- 3. LÓGICA TCP ---
 function processarRecebimento(pacote) {
-    // Garante números
     pacote.tcp_seq = Number(pacote.tcp_seq);
     pacote.tcp_ack = Number(pacote.tcp_ack);
     
     atualizarInspetor(pacote, "entrada");
     logSistema(`RX [${pacote.type}] SEQ=${pacote.tcp_seq}`);
 
-    // Lógica ACK
     let incremento = 0;
     if (pacote.type === "SYN" || pacote.type === "SYN-ACK") incremento = 1;
     else if (pacote.type === "DATA" && pacote.payload) incremento = pacote.payload.length;
@@ -155,7 +175,6 @@ function processarRecebimento(pacote) {
         currentAck = pacote.tcp_seq + incremento;
     }
 
-    // Máquina de Estados
     switch (tcpState) {
         case "CLOSED":
             if (pacote.type === "SYN") {
@@ -266,6 +285,7 @@ function criarElementoPacote(t, d) {
     packetLayer.appendChild(el); setTimeout(()=>el.remove(), 1600);
 }
 if(msgInput) msgInput.addEventListener("keypress", e=>{if(e.key==="Enter"){e.preventDefault();enviarMensagem()}});
+
 function notificarConexaoEstabelecida() {
     const statusEl = document.getElementById("display-status");
     statusEl.innerText = "Parceiro Conectado";
@@ -281,8 +301,6 @@ function mostrarModalDesconexao() {
     document.getElementById("display-status").innerText = "Parceiro Desconectado";
     document.getElementById("display-status").style.color = "#ff7b72";
 }
-
-// --- AÇÕES DOS BOTÕES DO MODAL ---
 
 function voltarLobby() {
     location.reload();
@@ -300,6 +318,7 @@ function reiniciarSala() {
     wireLine.classList.remove("connected");
     remoteBadge.innerText = "LISTENING"; 
     remoteBadge.classList.remove("ESTABLISHED");
+    remoteBadge.className = "status-badge"; 
     
     msgInput.disabled = true;
     btnSend.disabled = true;
@@ -307,7 +326,6 @@ function reiniciarSala() {
     const statusEl = document.getElementById("display-status");
     statusEl.innerText = "Aguardando Jogador 2...";
     statusEl.style.color = "#e3b341";
-    
 }
 
 conectarWS();
