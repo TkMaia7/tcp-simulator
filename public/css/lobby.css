@@ -1,0 +1,115 @@
+/* =========================================
+   LOBBY.CSS
+   Estilos específicos da Tela de Entrada (Salas)
+   ========================================= */
+
+/* Container que centraliza a caixa na tela */
+#lobby-screen {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 20px 0;
+}
+
+/* A "Caixa" (Card) de Login */
+.lobby-box {
+    background: #21262d;       /* Fundo cinza escuro */
+    padding: 30px;
+    border-radius: 8px;
+    border: 1px solid #30363d; /* Borda sutil */
+    width: 100%;
+    max-width: 400px;          /* Largura máxima fixa para não esticar */
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Título do Lobby */
+.lobby-box h2 {
+    margin-top: 0;
+    color: #58a6ff;            /* Azul destaque */
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+}
+
+/* =========================================
+   FORMULÁRIOS (Inputs e Labels)
+   ========================================= */
+
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: #8b949e;            /* Texto secundário */
+    font-weight: bold;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 10px;
+    background: #0d1117;       /* Fundo mais escuro que a caixa */
+    border: 1px solid #30363d;
+    color: #fff;
+    border-radius: 4px;
+    box-sizing: border-box;    /* Garante que o padding não aumente a largura */
+    font-family: inherit;      /* Mantém a fonte Courier */
+    transition: border-color 0.2s;
+}
+
+/* Efeito de Foco no Input */
+.input-group input:focus {
+    border-color: #58a6ff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+}
+
+/* =========================================
+   BOTÕES DE AÇÃO DO LOBBY
+   ========================================= */
+
+.lobby-actions {
+    display: flex;
+    gap: 10px;                 /* Espaço entre os botões */
+    margin-top: 25px;
+}
+
+/* Faz os botões dividirem o espaço igualmente */
+.lobby-actions button {
+    flex: 1;
+}
+
+/* Cores Específicas dos Botões */
+.btn-create {
+    background-color: #1f6feb; /* Azul GitHub */
+    border-color: rgba(255,255,255,0.1);
+}
+.btn-create:hover {
+    background-color: #388bfd;
+}
+
+.btn-join {
+    background-color: #238636; /* Verde GitHub (Padrão) */
+}
+/* O hover do btn-join já é tratado pelo global.css */
+
+/* Botão de Sair/Erro (Vermelho) */
+.btn-exit {
+    background-color: #da3633;
+    border-color: #f85149;
+    color: white;
+}
+.btn-exit:hover {
+    background-color: #b62324;
+}
+
+#lobby-msg {
+    margin-top: 15px;
+    text-align: center;
+    font-size: 0.8rem;
+    min-height: 20px;          /* Reserva espaço para o texto não pular */
+    font-weight: bold;
+}
