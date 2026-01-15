@@ -1,205 +1,152 @@
+/* =========================================
+   SIMULATOR
+   ========================================= */
 
-/* --- ESTILOS DESKTOP (Base) --- */
-.room-info-bar {
-    background: #21262d;
-    padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    font-size: 0.85rem;
-    color: #8b949e;
-    border: 1px solid #30363d;
-    display: flex;
-    justify-content: space-between;
-}
-
+/* --- ESTRUTURA DE LAYOUT --- */
 .workspace {
     display: flex;
     gap: 20px;
     align-items: stretch;
+    min-height: 550px;
 }
 
-.left-panel { flex: 2; display: flex; flex-direction: column; }
-.right-panel { flex: 1; min-width: 320px; }
+.left-panel { flex: 2; display: flex; flex-direction: column; gap: 15px; }
+.right-panel { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 15px; }
 
-/* REDE */
+/* --- STATUS BAR --- */
+.room-info-bar {
+    background: #21262d; padding: 10px 15px; border-radius: 6px;
+    margin-bottom: 20px; font-size: 0.9rem; color: #8b949e;
+    border: 1px solid #30363d; display: flex;
+    justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* --- REDE (VISUALIZAÇÃO) --- */
 .network-stage {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    position: relative;
-    padding: 0 10px;
-    flex-grow: 1;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px; background: #161b22; border-radius: 8px;
+    border: 1px solid #30363d; position: relative; min-height: 140px;
 }
 
-.node { z-index: 2; position: relative; text-align: center; }
-.icon { font-size: 3rem; margin-bottom: 5px; }
-.label { font-weight: bold; color: #58a6ff; font-size: 0.9rem; }
-.ip-addr { font-size: 0.7rem; color: #484f58; margin-top: 2px; }
+.node { z-index: 2; position: relative; text-align: center; min-width: 80px; }
+.icon { font-size: 3rem; margin-bottom: 8px; display: block; }
+.label { font-weight: bold; color: #58a6ff; font-size: 0.9rem; display: block; }
+.ip-addr { font-size: 0.75rem; color: #484f58; margin-top: 4px; display: block; font-family: monospace; }
 
 .status-badge {
-    margin-top: 5px; font-size: 0.7rem; padding: 3px 6px;
-    background: #21262d; border: 1px solid #30363d; color: #8b949e;
-    border-radius: 4px; font-weight: bold; text-transform: uppercase;
-    transition: all 0.3s;
+    margin-top: 6px; font-size: 0.7rem; padding: 4px 8px;
+    background: #0d1117; border: 1px solid #30363d; color: #8b949e;
+    border-radius: 12px; font-weight: bold; text-transform: uppercase;
+    transition: all 0.3s; display: inline-block;
 }
-.status-badge.CLOSED { color: #ff7b72; border-color: #ff7b72; }
-.status-badge.SYN_SENT { color: #d29922; border-color: #d29922; }
-.status-badge.SYN_RCVD { color: #e3b341; border-color: #e3b341; }
-.status-badge.ESTABLISHED { color: #3fb950; border-color: #3fb950; background: rgba(63, 185, 80, 0.1); }
-.status-badge.FIN_WAIT_1, 
-.status-badge.FIN_WAIT_2, 
-.status-badge.CLOSING, 
-.status-badge.TIME_WAIT, 
-.status-badge.CLOSE_WAIT, 
-.status-badge.LAST_ACK { 
-    color: #d03592; 
-    border-color: #d03592; 
-    background: rgba(208, 53, 146, 0.1); 
-}
+.status-badge.CLOSED { color: #ff7b72; border-color: rgba(255, 123, 114, 0.3); }
+.status-badge.SYN_SENT { color: #d29922; border-color: rgba(210, 153, 34, 0.3); }
+.status-badge.SYN_RCVD { color: #e3b341; border-color: rgba(227, 179, 65, 0.3); }
+.status-badge.ESTABLISHED { color: #3fb950; border-color: rgba(63, 185, 80, 0.3); background: rgba(63, 185, 80, 0.05); }
+.status-badge.FIN_WAIT_1, .status-badge.FIN_WAIT_2, .status-badge.TIME_WAIT { color: #d03592; border-color: rgba(208, 53, 146, 0.3); }
 
-/* FIO */
+/* Fios e Pacotes */
 .wire-container {
-    flex-grow: 1; position: relative; height: 60px; margin: 0 20px;
+    flex-grow: 1; position: relative; height: 60px; margin: 0 15px;
     display: flex; align-items: center;
 }
 .wire { width: 100%; height: 2px; background: #30363d; transition: 0.5s; }
 .wire.connected { background: #3fb950; height: 3px; box-shadow: 0 0 10px rgba(63, 185, 80, 0.4); }
 
-/* PACOTES */
 .packet {
-    position: absolute; top: 18px; padding: 5px 10px; border-radius: 4px;
-    font-size: 0.7rem; font-weight: bold; color: #0d1117;
-    box-shadow: 0 0 10px rgba(255,255,255,0.5); min-width: 80px; text-align: center;
-    border: 1px solid rgba(255,255,255,0.2); z-index: 10;
+    position: absolute; top: 18px; padding: 5px 12px; border-radius: 4px;
+    font-size: 0.75rem; font-weight: bold; color: #0d1117;
+    box-shadow: 0 0 15px rgba(255,255,255,0.3); min-width: 80px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.4); z-index: 10;
 }
 .packet.SYN { background: #d29922; color: #fff; }
 .packet.SYN-ACK { background: #e3b341; color: #000; }
 .packet.ACK { background: #3fb950; color: #000; }
 .packet.DATA { background: #1f6feb; color: #fff; border: 1px solid #58a6ff; }
-.packet.RESET { background: #da3633; color: #fff; }
-.packet.FIN { background: #d03592; color: white; } 
+.packet.FIN { background: #d03592; color: white; }
 .packet.FIN-ACK { background: #a371f7; color: white; }
 
-@keyframes moveRight { 0% { left: 0; opacity: 1; } 90% { left: 90%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
-@keyframes moveLeft { 0% { left: 100%; opacity: 1; } 90% { left: 10%; opacity: 1; } 100% { left: 0; opacity: 0; } }
+/* Animações */
+@keyframes moveRight { 0% { left: 0; opacity: 0; transform: scale(0.8); } 10% { opacity: 1; transform: scale(1); } 90% { left: 90%; opacity: 1; transform: scale(1); } 100% { left: 100%; opacity: 0; transform: scale(0.8); } }
+@keyframes moveLeft { 0% { left: 100%; opacity: 0; transform: scale(0.8); } 10% { opacity: 1; transform: scale(1); } 90% { left: 10%; opacity: 1; transform: scale(1); } 100% { left: 0; opacity: 0; transform: scale(0.8); } }
 .anim-right { animation: moveRight 1.5s ease-in-out forwards; }
 .anim-left { animation: moveLeft 1.5s ease-in-out forwards; }
 
-/* DADOS E CHAT */
+/* --- CHAT E LOGS --- */
 .data-section {
-    margin-bottom: 15px; border: 1px solid #30363d; background: #0d1117;
-    border-radius: 6px; padding: 10px;
+    border: 1px solid #30363d; background: #0d1117;
+    border-radius: 8px; padding: 12px;
+    display: flex; flex-direction: column; gap: 10px; flex-grow: 1;
 }
 .chat-window {
-    height: 120px; overflow-y: auto; border-bottom: 1px solid #30363d;
-    margin-bottom: 10px; padding: 5px; display: flex; flex-direction: column; gap: 8px;
+    height: 120px; overflow-y: auto; border: 1px solid #30363d; border-radius: 4px;
+    padding: 8px; display: flex; flex-direction: column; gap: 8px; background: #010409;
 }
-.chat-msg { max-width: 80%; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; word-break: break-all; }
+.chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; word-break: break-all; }
 .msg-sent { align-self: flex-end; background: #1f6feb; color: white; }
 .msg-received { align-self: flex-start; background: #238636; color: white; }
-.system-msg { align-self: center; color: #484f58; font-size: 0.7rem; font-style: italic; }
+.system-msg { align-self: center; color: #484f58; font-size: 0.75rem; font-style: italic; margin: 10px 0; }
 
-.input-area { display: flex; gap: 5px; }
-#msg-input { flex-grow: 1; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; font-family: inherit; }
-#msg-input:disabled { background: #21262d; cursor: not-allowed; opacity: 0.5; }
+.input-area { display: flex; gap: 8px; }
+#msg-input { flex-grow: 1; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; padding: 10px; border-radius: 4px; font-family: inherit; }
+#btn-send-data { padding: 0 20px; }
 
-/* CONTROLES E LOGS */
-.controls { margin-bottom: 10px; display: flex; gap: 10px; }
+/* CONTROLES */
+.controls { display: flex; gap: 10px; margin-bottom: 0; }
+.controls button { padding: 10px 15px; font-size: 0.9rem; flex: 1; }
+
+/* RODAPÉ ALINHADO (LOGS) */
 .terminal-log {
-    background: #010409; border: 1px solid #30363d; border-radius: 6px;
-    text-align: left; font-size: 0.75rem; margin-top: auto;
+    background: #010409; border: 1px solid #30363d; border-radius: 8px;
+    text-align: left; font-size: 0.8rem;
+    height: 90px; /* Altura fixa */
+    margin-top: auto; 
+    display: flex; flex-direction: column; overflow: hidden;
 }
-.terminal-header { background: #161b22; padding: 4px 10px; color: #8b949e; border-bottom: 1px solid #30363d; font-weight: bold; }
-.terminal-body { padding: 8px 10px; color: #3fb950; height: 40px; overflow-y: auto; }
+.terminal-header { background: #161b22; padding: 6px 12px; color: #8b949e; border-bottom: 1px solid #30363d; font-weight: bold; font-size: 0.75rem; letter-spacing: 0.5px; }
+.terminal-body { padding: 8px 12px; color: #3fb950; flex-grow: 1; overflow-y: auto; font-family: monospace; }
 
-/* INSPETOR (Direita) */
+/* --- INSPETOR (Direita) --- */
 .inspector-box {
-    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
-    padding: 15px; height: 100%; box-sizing: border-box;
-    transition: border-color 0.3s; display: flex; flex-direction: column;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 15px; flex-grow: 1; display: flex; flex-direction: column;
 }
-.inspector-box h3 { margin-top: 0; font-size: 1rem; color: #c9d1d9; margin-bottom: 5px; }
-.inspector-hint { font-size: 0.7rem; color: #8b949e; margin-bottom: 15px; }
+.inspector-box h3 { margin: 0 0 5px 0; font-size: 1.1rem; color: #c9d1d9; border-bottom: 1px solid #30363d; padding-bottom: 10px; margin-bottom: 15px; }
+.inspector-hint { display: none; }
+
 .tcp-header-visual {
-    border: 2px solid #30363d; background: #0d1117; font-size: 0.75rem;
-    font-family: monospace; flex-grow: 1;
+    border: 1px solid #30363d; background: #0d1117; font-size: 0.8rem;
+    font-family: monospace; flex-grow: 1; display: flex; flex-direction: column;
+    border-radius: 4px; overflow: hidden;
 }
 .tcp-header-visual .row { display: flex; border-bottom: 1px solid #30363d; }
 .tcp-header-visual .row:last-child { border-bottom: none; }
-.tcp-header-visual .field { flex: 1; padding: 8px; border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 2px; }
+.tcp-header-visual .field { flex: 1; padding: 10px; border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 4px; }
 .tcp-header-visual .field:last-child { border-right: none; }
-.tcp-header-visual .full { padding: 8px; display: flex; justify-content: space-between; }
-.tcp-header-visual .field.small { padding: 6px; text-align: center; justify-content: center; }
-.payload-content { margin-top: 5px; color: #58a6ff; min-height: 40px; background: rgba(88, 166, 255, 0.1); padding: 8px; border-radius: 4px; word-break: break-all; }
-.highlight-val { color: #e3b341; font-weight: bold; font-size: 0.9rem; }
-.flag-text { color: #ff7b72; font-weight: bold; }
+.tcp-header-visual .full { padding: 10px; display: flex; justify-content: space-between; align-items: center; background: #161b22; }
+.tcp-header-visual .field.small { padding: 8px; text-align: center; justify-content: center; background: #0d1117; }
+.payload-row { flex-grow: 1; display: flex; }
+.payload-content { margin-top: 5px; color: #58a6ff; height: 100%; background: rgba(88, 166, 255, 0.05); padding: 10px; border-radius: 4px; word-break: break-all; display: flex; align-items: center; justify-content: center; text-align: center; }
+
+/* Animações Texto */
 @keyframes flashUpdate { 0% { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.1); } 100% { color: #e3b341; transform: scale(1); } }
-.flash-text { animation: flashUpdate 0.5s ease-out; color: #e3b341; }
+.flash-text { animation: flashUpdate 0.4s ease-out; color: #e3b341; font-weight: bold; }
+.highlight-val { color: #e3b341; font-weight: bold; font-size: 1rem; }
+.flag-text { color: #ff7b72; font-weight: bold; }
 
-/* --- ADAPTAÇÃO MOBILE (A Mágica da IA) --- */
+/* --- MOBILE --- */
 @media (max-width: 768px) {
-    /* Transforma a tela em coluna (Empilhamento) */
-    .workspace {
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    /* O Painel da direita (Inspetor) vai para baixo e ocupa tudo */
-    .right-panel {
-        width: 100%;
-        min-width: auto;
-        order: 2; /* Garante que fique abaixo */
-    }
-    
-    .left-panel {
-        width: 100%;
-        order: 1;
-    }
-
-    /* Ajuste da REDE (Para caber na tela vertical) */
-    .network-stage {
-        padding: 0;
-        justify-content: space-around; /* Espalha melhor */
-    }
-
-    .node {
-        min-width: 60px; /* Nós menores */
-    }
-
-    .icon { font-size: 2rem; } /* Ícone menor */
-
-    /* Fio mais curto para aproximar os PCs */
-    .wire-container {
-        margin: 0 5px;
-        height: 50px;
-    }
-
-    /* CONTROLES (Botões) - Grid 2x2 para ser fácil de tocar */
-    .controls {
-        display: grid;
-        grid-template-columns: 1fr 1fr; /* Dois botões por linha */
-        gap: 8px;
-    }
-
-    .controls button {
-        padding: 12px; /* Botões gordos para dedo */
-        height: auto;
-    }
-
-    /* Chat e Input */
-    .chat-window {
-        height: 140px; /* Um pouco maior no celular */
-    }
-    
-    .input-area button {
-        padding: 0 15px; /* Botão enviar mais largo */
-    }
-
-    /* Info Bar ajustada */
-    .room-info-bar {
-        flex-direction: column;
-        gap: 5px;
-        text-align: center;
-    }
+    .workspace { flex-direction: column; gap: 20px; min-height: auto; }
+    .left-panel, .right-panel { width: 100%; min-width: auto; flex: none; }
+    .right-panel { order: 2; height: auto; }
+    .terminal-log { height: auto; min-height: 60px; }
+    .network-stage { padding: 10px 0; justify-content: space-around; }
+    .node { min-width: 60px; }
+    .icon { font-size: 2rem; }
+    .wire-container { margin: 0 5px; height: 50px; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .controls button { height: auto; padding: 15px; }
+    .chat-window { height: 150px; }
+    .inspector-box { min-height: 300px; }
 }

@@ -3,8 +3,9 @@ import json
 import websockets
 
 ROOMS = {}
+ALL_CLIENTS = set()
 
-async def handler(websocket):
+async def handler(websocket, path=None):
     print(f"[NOVA CONEXÃO] {websocket.remote_address}")
     websocket.current_room_id = None 
     
@@ -31,22 +32,19 @@ async def handler(websocket):
         await handle_disconnect(websocket)
 
 async def send_room_list(ws):
-    # Cria uma lista apenas com os nomes das salas
     lista_salas = list(ROOMS.keys())
     msg = json.dumps({"type": "ROOM_LIST", "rooms": lista_salas})
     await ws.send(msg)
 
-async def broadcast_room_list():
-    lista_salas = list(ROOMS.keys())
-    msg = json.dumps({"type": "ROOM_LIST", "rooms": lista_salas})
-    
-    pass 
-ALL_CLIENTS = set()
-
-async def handler_wrapper(websocket):
+# Wrapper também precisa aceitar o path opcional
+async def handler_wrapper(websocket, path=None):
     ALL_CLIENTS.add(websocket)
     try:
-        await handler(websocket)
+        # Passa o path adiante se ele existir
+        if path:
+            await handler(websocket, path)
+        else:
+            await handler(websocket)
     finally:
         ALL_CLIENTS.remove(websocket)
 
@@ -76,7 +74,7 @@ async def handle_create_room(ws, data):
     print(f"[SALA CRIADA] {room_id}")
     
     await ws.send(json.dumps({"type": "ROOM_ACCEPTED", "room_id": room_id, "role": "HOST"}))
-    await broadcast_lobby_update() # Atualiza o lobby dos outros
+    await broadcast_lobby_update() 
 
 async def handle_join_room(ws, data):
     room_id = data.get("room_id")
@@ -114,7 +112,7 @@ async def handle_simulation_message(ws, data):
     if tasks: await asyncio.gather(*tasks, return_exceptions=True)
 
 async def handle_disconnect(ws):
-    room_id = ws.current_room_id
+    room_id = getattr(ws, 'current_room_id', None)
     if room_id and room_id in ROOMS:
         room = ROOMS[room_id]
         if ws in room["clients"]: room["clients"].remove(ws)
@@ -136,4 +134,7 @@ async def main():
         await asyncio.get_running_loop().create_future()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nServidor parado.")

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/global.css">
     <link rel="stylesheet" href="css/lobby.css">
     <link rel="stylesheet" href="css/simulator.css">
+    <link rel="stylesheet" href="css/chaos.css">
 </head>
 <body>
 
@@ -128,6 +129,10 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <button id="btn-open-chaos" onclick="toggleChaosMode()" class="btn-chaos-entry">
+                        Abrir Laboratório de Testes
+                    </button>
                 </div>
             </div>
         </div>
@@ -142,6 +147,46 @@
             <div class="modal-actions">
                 <button onclick="reiniciarSala()" class="btn-restart">Aguardar Novo Parceiro</button>
                 <button onclick="voltarLobby()" class="btn-lobby secondary">Voltar ao Lobby</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chaos-screen" style="display: none;">
+        <div class="chaos-header">
+            <h2>LABORATÓRIO DE CAOS TCP</h2>
+            <button onclick="requestToggleChaos()" class="btn-close-chaos">Voltar</button>
+        </div>
+
+        <div class="chaos-stage">
+            <div class="node-icon">💻 Cli</div>
+            <div class="chaos-wire-container">
+                <div class="chaos-wire"></div>
+                <div id="chaos-packet-layer"></div> </div>
+            <div class="node-icon">🖥️ Srv</div>
+        </div>
+
+        <div class="chaos-controls">
+            <div class="control-group">
+                <label>Pacotes:</label>
+                <div class="burst-selector">
+                    <button class="btn-opt" onclick="mudarQtdRajada(3, this)">3</button>
+                    <button class="btn-opt selected" onclick="mudarQtdRajada(5, this)">5</button>
+                    <button class="btn-opt" onclick="mudarQtdRajada(10, this)">10</button>
+                </div>
+            </div>
+            <button id="btn-fire-burst" onclick="dispararRajada()" class="btn-fire">DISPARAR</button>
+            
+            <div class="divider-v"></div>
+
+            <button id="btn-pause-toggle" onclick="alternarPause()" class="btn-pause" disabled>
+                PAUSAR TUDO
+            </button>
+        </div>
+
+        <div id="chaos-editor-area" class="chaos-editor hidden">
+            <h3>Manipulação de Pacotes (Tempo Parado)</h3>
+            <div id="active-packet-list">
+                <div class="empty-list-msg">Nenhum pacote na rede.</div>
             </div>
         </div>
     </div>
