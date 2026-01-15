@@ -47,6 +47,16 @@
 .status-badge.SYN_SENT { color: #d29922; border-color: #d29922; }
 .status-badge.SYN_RCVD { color: #e3b341; border-color: #e3b341; }
 .status-badge.ESTABLISHED { color: #3fb950; border-color: #3fb950; background: rgba(63, 185, 80, 0.1); }
+.status-badge.FIN_WAIT_1, 
+.status-badge.FIN_WAIT_2, 
+.status-badge.CLOSING, 
+.status-badge.TIME_WAIT, 
+.status-badge.CLOSE_WAIT, 
+.status-badge.LAST_ACK { 
+    color: #d03592; 
+    border-color: #d03592; 
+    background: rgba(208, 53, 146, 0.1); 
+}
 
 /* FIO */
 .wire-container {
@@ -68,6 +78,8 @@
 .packet.ACK { background: #3fb950; color: #000; }
 .packet.DATA { background: #1f6feb; color: #fff; border: 1px solid #58a6ff; }
 .packet.RESET { background: #da3633; color: #fff; }
+.packet.FIN { background: #d03592; color: white; } 
+.packet.FIN-ACK { background: #a371f7; color: white; }
 
 @keyframes moveRight { 0% { left: 0; opacity: 1; } 90% { left: 90%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
 @keyframes moveLeft { 0% { left: 100%; opacity: 1; } 90% { left: 10%; opacity: 1; } 100% { left: 0; opacity: 0; } }
