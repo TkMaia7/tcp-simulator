@@ -1,11 +1,5 @@
-/* =========================================
-   SIMULATOR.CSS
-   Estilos da área de trabalho, rede, chat e inspetor
-   ========================================= */
 
-/* --- LAYOUT PRINCIPAL DO WORKSPACE --- */
-
-/* Barra de informações no topo (Sala: X | Status: Y) */
+/* --- ESTILOS DESKTOP (Base) --- */
 .room-info-bar {
     background: #21262d;
     padding: 8px 12px;
@@ -18,28 +12,16 @@
     justify-content: space-between;
 }
 
-/* Container flexível que divide Esquerda (Simulação) e Direita (Inspetor) */
 .workspace {
     display: flex;
     gap: 20px;
-    align-items: stretch; /* FORÇA as duas colunas a terem a mesma altura */
+    align-items: stretch;
 }
 
-.left-panel {
-    flex: 2; /* Ocupa 2/3 da tela */
-    display: flex;
-    flex-direction: column;
-}
+.left-panel { flex: 2; display: flex; flex-direction: column; }
+.right-panel { flex: 1; min-width: 320px; }
 
-.right-panel {
-    flex: 1; /* Ocupa 1/3 da tela */
-    min-width: 320px;
-}
-
-/* =========================================
-   VISUALIZAÇÃO DA REDE (Network Stage)
-   ========================================= */
-
+/* REDE */
 .network-stage {
     display: flex;
     justify-content: space-between;
@@ -47,354 +29,165 @@
     margin-bottom: 20px;
     position: relative;
     padding: 0 10px;
-    flex-grow: 1; /* Ocupa espaço disponível verticalmente */
+    flex-grow: 1;
 }
 
-/* Os Computadores (Nós) */
-.node {
-    z-index: 2; /* Fica acima do fio */
-    position: relative;
-    text-align: center;
-}
+.node { z-index: 2; position: relative; text-align: center; }
+.icon { font-size: 3rem; margin-bottom: 5px; }
+.label { font-weight: bold; color: #58a6ff; font-size: 0.9rem; }
+.ip-addr { font-size: 0.7rem; color: #484f58; margin-top: 2px; }
 
-.icon {
-    font-size: 3rem; /* Tamanho do Emoji */
-    margin-bottom: 5px;
-}
-
-.label {
-    font-weight: bold;
-    color: #58a6ff;
-    font-size: 0.9rem;
-}
-
-.ip-addr {
-    font-size: 0.7rem;
-    color: #484f58;
-    margin-top: 2px;
-}
-
-/* Badges de Status (CLOSED, ESTABLISHED, etc) */
 .status-badge {
-    margin-top: 5px;
-    font-size: 0.7rem;
-    padding: 3px 6px;
-    background: #21262d;
-    border: 1px solid #30363d;
-    color: #8b949e;
-    border-radius: 4px;
-    font-weight: bold;
-    text-transform: uppercase;
+    margin-top: 5px; font-size: 0.7rem; padding: 3px 6px;
+    background: #21262d; border: 1px solid #30363d; color: #8b949e;
+    border-radius: 4px; font-weight: bold; text-transform: uppercase;
     transition: all 0.3s;
 }
-
-/* Cores dos Status */
 .status-badge.CLOSED { color: #ff7b72; border-color: #ff7b72; }
 .status-badge.SYN_SENT { color: #d29922; border-color: #d29922; }
 .status-badge.SYN_RCVD { color: #e3b341; border-color: #e3b341; }
-.status-badge.ESTABLISHED { 
-    color: #3fb950; 
-    border-color: #3fb950; 
-    background: rgba(63, 185, 80, 0.1); 
-}
+.status-badge.ESTABLISHED { color: #3fb950; border-color: #3fb950; background: rgba(63, 185, 80, 0.1); }
 
-/* O Fio (Cabo de Rede) */
+/* FIO */
 .wire-container {
-    flex-grow: 1;
-    position: relative;
-    height: 60px; /* Área onde a bolinha passa */
-    margin: 0 20px;
-    display: flex;
-    align-items: center;
+    flex-grow: 1; position: relative; height: 60px; margin: 0 20px;
+    display: flex; align-items: center;
 }
+.wire { width: 100%; height: 2px; background: #30363d; transition: 0.5s; }
+.wire.connected { background: #3fb950; height: 3px; box-shadow: 0 0 10px rgba(63, 185, 80, 0.4); }
 
-.wire {
-    width: 100%;
-    height: 2px;
-    background: #30363d;
-    transition: 0.5s;
-}
-
-.wire.connected {
-    background: #3fb950;
-    height: 3px;
-    box-shadow: 0 0 10px rgba(63, 185, 80, 0.4);
-}
-
-/* =========================================
-   PACOTES (Bolinhas animadas)
-   ========================================= */
-
+/* PACOTES */
 .packet {
-    position: absolute;
-    top: 18px; /* Centraliza verticalmente no fio */
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: bold;
-    color: #0d1117;
-    box-shadow: 0 0 10px rgba(255,255,255,0.5);
-    min-width: 80px;
-    text-align: center;
-    border: 1px solid rgba(255,255,255,0.2);
-    z-index: 10;
+    position: absolute; top: 18px; padding: 5px 10px; border-radius: 4px;
+    font-size: 0.7rem; font-weight: bold; color: #0d1117;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5); min-width: 80px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.2); z-index: 10;
 }
-
-/* Cores dos Pacotes */
 .packet.SYN { background: #d29922; color: #fff; }
 .packet.SYN-ACK { background: #e3b341; color: #000; }
 .packet.ACK { background: #3fb950; color: #000; }
 .packet.DATA { background: #1f6feb; color: #fff; border: 1px solid #58a6ff; }
 .packet.RESET { background: #da3633; color: #fff; }
 
-/* Animações de Movimento */
-@keyframes moveRight { 
-    0% { left: 0; opacity: 1; } 
-    90% { left: 90%; opacity: 1; } 
-    100% { left: 100%; opacity: 0; } 
-}
-
-@keyframes moveLeft { 
-    0% { left: 100%; opacity: 1; } 
-    90% { left: 10%; opacity: 1; } 
-    100% { left: 0; opacity: 0; } 
-}
-
+@keyframes moveRight { 0% { left: 0; opacity: 1; } 90% { left: 90%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
+@keyframes moveLeft { 0% { left: 100%; opacity: 1; } 90% { left: 10%; opacity: 1; } 100% { left: 0; opacity: 0; } }
 .anim-right { animation: moveRight 1.5s ease-in-out forwards; }
 .anim-left { animation: moveLeft 1.5s ease-in-out forwards; }
 
-/* =========================================
-   ÁREA DE DADOS (Chat)
-   ========================================= */
-
+/* DADOS E CHAT */
 .data-section {
-    margin-bottom: 15px;
-    border: 1px solid #30363d;
-    background: #0d1117;
-    border-radius: 6px;
-    padding: 10px;
+    margin-bottom: 15px; border: 1px solid #30363d; background: #0d1117;
+    border-radius: 6px; padding: 10px;
 }
-
 .chat-window {
-    height: 120px;
-    overflow-y: auto;
-    border-bottom: 1px solid #30363d;
-    margin-bottom: 10px;
-    padding: 5px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    height: 120px; overflow-y: auto; border-bottom: 1px solid #30363d;
+    margin-bottom: 10px; padding: 5px; display: flex; flex-direction: column; gap: 8px;
 }
+.chat-msg { max-width: 80%; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; word-break: break-all; }
+.msg-sent { align-self: flex-end; background: #1f6feb; color: white; }
+.msg-received { align-self: flex-start; background: #238636; color: white; }
+.system-msg { align-self: center; color: #484f58; font-size: 0.7rem; font-style: italic; }
 
-/* Balões de Mensagem */
-.chat-msg {
-    max-width: 80%;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    word-break: break-all; /* Quebra palavras longas */
-}
+.input-area { display: flex; gap: 5px; }
+#msg-input { flex-grow: 1; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; padding: 8px; border-radius: 4px; font-family: inherit; }
+#msg-input:disabled { background: #21262d; cursor: not-allowed; opacity: 0.5; }
 
-.msg-sent {
-    align-self: flex-end;
-    background: #1f6feb;
-    color: white;
-}
-
-.msg-received {
-    align-self: flex-start;
-    background: #238636;
-    color: white;
-}
-
-.system-msg {
-    align-self: center;
-    color: #484f58;
-    font-size: 0.7rem;
-    font-style: italic;
-}
-
-/* Input e Botão */
-.input-area {
-    display: flex;
-    gap: 5px;
-}
-
-#msg-input {
-    flex-grow: 1;
-    background: #161b22;
-    border: 1px solid #30363d;
-    color: #c9d1d9;
-    padding: 8px;
-    border-radius: 4px;
-    font-family: inherit;
-}
-
-#msg-input:disabled {
-    background: #21262d;
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* =========================================
-   CONTROLES E LOGS
-   ========================================= */
-
-.controls {
-    margin-bottom: 10px;
-    display: flex;
-    gap: 10px;
-}
-
+/* CONTROLES E LOGS */
+.controls { margin-bottom: 10px; display: flex; gap: 10px; }
 .terminal-log {
-    background: #010409;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    text-align: left;
-    font-size: 0.75rem;
-    margin-top: auto; /* Empurra para o final se sobrar espaço */
+    background: #010409; border: 1px solid #30363d; border-radius: 6px;
+    text-align: left; font-size: 0.75rem; margin-top: auto;
 }
+.terminal-header { background: #161b22; padding: 4px 10px; color: #8b949e; border-bottom: 1px solid #30363d; font-weight: bold; }
+.terminal-body { padding: 8px 10px; color: #3fb950; height: 40px; overflow-y: auto; }
 
-.terminal-header {
-    background: #161b22;
-    padding: 4px 10px;
-    color: #8b949e;
-    border-bottom: 1px solid #30363d;
-    font-weight: bold;
-}
-
-.terminal-body {
-    padding: 8px 10px;
-    color: #3fb950;
-    height: 40px; /* Altura fixa para 2 ou 3 linhas */
-    overflow-y: auto;
-}
-
-/* =========================================
-   INSPETOR DE PACOTES (Painel Direito)
-   ========================================= */
-
+/* INSPETOR (Direita) */
 .inspector-box {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 15px;
-    height: 100%; /* Ocupa 100% da altura disponível */
-    box-sizing: border-box; /* O Pulo do Gato: padding não aumenta altura */
-    transition: border-color 0.3s;
-    display: flex;
-    flex-direction: column;
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 15px; height: 100%; box-sizing: border-box;
+    transition: border-color 0.3s; display: flex; flex-direction: column;
 }
-
-.inspector-box h3 {
-    margin-top: 0;
-    font-size: 1rem;
-    color: #c9d1d9;
-    margin-bottom: 5px;
-}
-
-.inspector-hint {
-    font-size: 0.7rem;
-    color: #8b949e;
-    margin-bottom: 15px;
-}
-
-/* O Grid Visual do Header TCP */
+.inspector-box h3 { margin-top: 0; font-size: 1rem; color: #c9d1d9; margin-bottom: 5px; }
+.inspector-hint { font-size: 0.7rem; color: #8b949e; margin-bottom: 15px; }
 .tcp-header-visual {
-    border: 2px solid #30363d;
-    background: #0d1117;
-    font-size: 0.75rem;
-    font-family: monospace;
-    flex-grow: 1; /* Ocupa o resto do espaço */
+    border: 2px solid #30363d; background: #0d1117; font-size: 0.75rem;
+    font-family: monospace; flex-grow: 1;
 }
+.tcp-header-visual .row { display: flex; border-bottom: 1px solid #30363d; }
+.tcp-header-visual .row:last-child { border-bottom: none; }
+.tcp-header-visual .field { flex: 1; padding: 8px; border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 2px; }
+.tcp-header-visual .field:last-child { border-right: none; }
+.tcp-header-visual .full { padding: 8px; display: flex; justify-content: space-between; }
+.tcp-header-visual .field.small { padding: 6px; text-align: center; justify-content: center; }
+.payload-content { margin-top: 5px; color: #58a6ff; min-height: 40px; background: rgba(88, 166, 255, 0.1); padding: 8px; border-radius: 4px; word-break: break-all; }
+.highlight-val { color: #e3b341; font-weight: bold; font-size: 0.9rem; }
+.flag-text { color: #ff7b72; font-weight: bold; }
+@keyframes flashUpdate { 0% { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.1); } 100% { color: #e3b341; transform: scale(1); } }
+.flash-text { animation: flashUpdate 0.5s ease-out; color: #e3b341; }
 
-.tcp-header-visual .row {
-    display: flex;
-    border-bottom: 1px solid #30363d;
-}
-
-.tcp-header-visual .row:last-child {
-    border-bottom: none;
-}
-
-.tcp-header-visual .field {
-    flex: 1;
-    padding: 8px;
-    border-right: 1px solid #30363d;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.tcp-header-visual .field:last-child {
-    border-right: none;
-}
-
-.tcp-header-visual .full {
-    padding: 8px;
-    display: flex;
-    justify-content: space-between;
-}
-
-/* Campo de Flags e HLEN (Grid menor) */
-.tcp-header-visual .field.small {
-    padding: 6px;
-    text-align: center;
-    justify-content: center;
-}
-
-/* Payload (Área de Dados) */
-.payload-content {
-    margin-top: 5px;
-    color: #58a6ff;
-    min-height: 40px;
-    background: rgba(88, 166, 255, 0.1);
-    padding: 8px;
-    border-radius: 4px;
-    word-break: break-all;
-}
-
-/* Destaques de Texto */
-.highlight-val {
-    color: #e3b341; /* Amarelo */
-    font-weight: bold;
-    font-size: 0.9rem;
-}
-
-.flag-text {
-    color: #ff7b72; /* Vermelho suave */
-    font-weight: bold;
-}
-
-/* Animação de Flash (quando SEQ/ACK mudam) */
-@keyframes flashUpdate { 
-    0% { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.1); } 
-    100% { color: #e3b341; transform: scale(1); } 
-}
-
-.flash-text {
-    animation: flashUpdate 0.5s ease-out;
-    color: #e3b341;
-}
-
+/* --- ADAPTAÇÃO MOBILE (A Mágica da IA) --- */
 @media (max-width: 768px) {
+    /* Transforma a tela em coluna (Empilhamento) */
     .workspace {
         flex-direction: column;
+        gap: 15px;
     }
 
+    /* O Painel da direita (Inspetor) vai para baixo e ocupa tudo */
     .right-panel {
-        min-width: 100%; 
+        width: 100%;
+        min-width: auto;
+        order: 2; /* Garante que fique abaixo */
     }
     
+    .left-panel {
+        width: 100%;
+        order: 1;
+    }
+
+    /* Ajuste da REDE (Para caber na tela vertical) */
     .network-stage {
         padding: 0;
+        justify-content: space-around; /* Espalha melhor */
     }
 
-    .icon {
-        font-size: 2rem;
+    .node {
+        min-width: 60px; /* Nós menores */
+    }
+
+    .icon { font-size: 2rem; } /* Ícone menor */
+
+    /* Fio mais curto para aproximar os PCs */
+    .wire-container {
+        margin: 0 5px;
+        height: 50px;
+    }
+
+    /* CONTROLES (Botões) - Grid 2x2 para ser fácil de tocar */
+    .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Dois botões por linha */
+        gap: 8px;
+    }
+
+    .controls button {
+        padding: 12px; /* Botões gordos para dedo */
+        height: auto;
+    }
+
+    /* Chat e Input */
+    .chat-window {
+        height: 140px; /* Um pouco maior no celular */
     }
     
-    .chat-window {
-        height: 100px;
+    .input-area button {
+        padding: 0 15px; /* Botão enviar mais largo */
+    }
+
+    /* Info Bar ajustada */
+    .room-info-bar {
+        flex-direction: column;
+        gap: 5px;
+        text-align: center;
     }
 }

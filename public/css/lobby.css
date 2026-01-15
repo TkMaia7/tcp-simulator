@@ -1,9 +1,4 @@
-/* =========================================
-   LOBBY.CSS
-   Estilos específicos da Tela de Entrada (Salas)
-   ========================================= */
-
-/* Container que centraliza a caixa na tela */
+/* --- ESTILOS DESKTOP  --- */
 #lobby-screen {
     display: flex;
     justify-content: center;
@@ -11,105 +6,108 @@
     padding: 20px 0;
 }
 
-/* A "Caixa" (Card) de Login */
 .lobby-box {
-    background: #21262d;       /* Fundo cinza escuro */
+    background: #21262d;
     padding: 30px;
     border-radius: 8px;
-    border: 1px solid #30363d; /* Borda sutil */
+    border: 1px solid #30363d;
     width: 100%;
-    max-width: 400px;          /* Largura máxima fixa para não esticar */
+    max-width: 400px; /* No PC mantém esse limite */
     text-align: left;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
-/* Título do Lobby */
 .lobby-box h2 {
     margin-top: 0;
-    color: #58a6ff;            /* Azul destaque */
+    color: #58a6ff;
     text-align: center;
     margin-bottom: 20px;
     font-size: 1.5rem;
 }
 
-/* =========================================
-   FORMULÁRIOS (Inputs e Labels)
-   ========================================= */
-
-.input-group {
-    margin-bottom: 15px;
-}
+.input-group { margin-bottom: 15px; }
 
 .input-group label {
     display: block;
     font-size: 0.85rem;
     margin-bottom: 6px;
-    color: #8b949e;            /* Texto secundário */
+    color: #8b949e;
     font-weight: bold;
 }
 
 .input-group input {
     width: 100%;
     padding: 10px;
-    background: #0d1117;       /* Fundo mais escuro que a caixa */
+    background: #0d1117;
     border: 1px solid #30363d;
     color: #fff;
     border-radius: 4px;
-    box-sizing: border-box;    /* Garante que o padding não aumente a largura */
-    font-family: inherit;      /* Mantém a fonte Courier */
+    box-sizing: border-box;
+    font-family: inherit;
     transition: border-color 0.2s;
 }
 
-/* Efeito de Foco no Input */
 .input-group input:focus {
     border-color: #58a6ff;
     outline: none;
     box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
 }
 
-/* =========================================
-   BOTÕES DE AÇÃO DO LOBBY
-   ========================================= */
-
 .lobby-actions {
     display: flex;
-    gap: 10px;                 /* Espaço entre os botões */
+    gap: 10px;
     margin-top: 25px;
 }
 
-/* Faz os botões dividirem o espaço igualmente */
-.lobby-actions button {
-    flex: 1;
-}
+.lobby-actions button { flex: 1; }
 
-/* Cores Específicas dos Botões */
-.btn-create {
-    background-color: #1f6feb; /* Azul GitHub */
-    border-color: rgba(255,255,255,0.1);
-}
-.btn-create:hover {
-    background-color: #388bfd;
-}
+.btn-create { background-color: #1f6feb; border-color: rgba(255,255,255,0.1); }
+.btn-create:hover { background-color: #388bfd; }
 
-.btn-join {
-    background-color: #238636; /* Verde GitHub (Padrão) */
-}
-/* O hover do btn-join já é tratado pelo global.css */
+.btn-join { background-color: #238636; }
 
-/* Botão de Sair/Erro (Vermelho) */
 .btn-exit {
     background-color: #da3633;
     border-color: #f85149;
     color: white;
 }
-.btn-exit:hover {
-    background-color: #b62324;
-}
+.btn-exit:hover { background-color: #b62324; }
 
 #lobby-msg {
     margin-top: 15px;
     text-align: center;
     font-size: 0.8rem;
-    min-height: 20px;          /* Reserva espaço para o texto não pular */
+    min-height: 20px;
     font-weight: bold;
+}
+
+/* --- ADAPTAÇÃO MOBILE (A Mágica acontece aqui) --- */
+@media (max-width: 768px) {
+    #lobby-screen {
+        padding: 10px; /* Menos borda */
+        align-items: center;
+        min-height: 60vh; /* Centraliza verticalmente */
+    }
+
+    .lobby-box {
+        max-width: 100%; /* Ocupa a largura total disponível */
+        padding: 20px;
+    }
+
+    /* Inputs maiores para dedo */
+    .input-group input {
+        padding: 15px; 
+        font-size: 16px; /* Evita zoom no iPhone */
+    }
+
+    /* Botões Empilhados e Grandes */
+    .lobby-actions {
+        flex-direction: column; /* Um embaixo do outro */
+        gap: 15px;
+    }
+
+    .lobby-actions button {
+        padding: 15px; /* Mais fácil de tocar */
+        font-size: 1rem;
+    }
 }

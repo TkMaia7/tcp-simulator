@@ -2,6 +2,8 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
     <title>TCP Simulator</title>
     <link rel="stylesheet" href="css/global.css">
     <link rel="stylesheet" href="css/lobby.css">
@@ -38,8 +40,8 @@
         <div id="workspace-screen" style="display: none;">
             
             <div class="room-info-bar">
-                Sala: <span id="display-room-name" class="highlight">---</span> | 
-                Status: <span id="display-status">Conectado ao Servidor</span>
+                <div>Sala: <span id="display-room-name" class="highlight">---</span></div>
+                <div>Status: <span id="display-status">Conectado</span></div>
             </div>
 
             <div class="workspace">
@@ -98,10 +100,8 @@
                                 <div class="field">Porta Dest: <span id="insp-dport">0</span></div>
                             </div>
                             <div class="row full">
-                                SEQ: <span id="insp-seq" class="highlight-val">0</span>
-                            </div>
-                            <div class="row full">
-                                ACK: <span id="insp-ack" class="highlight-val">0</span>
+                                <span>SEQ: <span id="insp-seq" class="highlight-val">0</span></span>
+                                <span>ACK: <span id="insp-ack" class="highlight-val">0</span></span>
                             </div>
                             <div class="row flags-row">
                                 <div class="field small">HLEN: 5</div>
@@ -110,8 +110,10 @@
                                 <div class="field small">WIN: 64k</div>
                             </div>
                             <div class="row full payload-row">
-                                <div class="field">Payload:</div>
-                                <div class="payload-content" id="insp-payload">[Vazio]</div>
+                                <div class="field" style="width: 100%;">
+                                    Payload:
+                                    <div class="payload-content" id="insp-payload">[Vazio]</div>
+                                </div>
                             </div>
                         </div>
                     </div>

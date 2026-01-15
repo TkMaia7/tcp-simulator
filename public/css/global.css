@@ -14,7 +14,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Container Principal (O "Card" da aplicação) */
+/* Container Principal */
 .main-container {
     background: #161b22;
     padding: 30px;
@@ -25,102 +25,58 @@ body {
     max-width: 1100px;
 }
 
-/* Cabeçalho (Título) */
-header {
-    margin-bottom: 20px;
-    text-align: center;
-}
+/* Cabeçalho */
+header { margin-bottom: 20px; text-align: center; }
+h1 { margin: 0; font-size: 1.8rem; color: #c9d1d9; }
+.highlight { color: #58a6ff; }
+.subtitle { color: #8b949e; font-size: 0.9rem; margin-top: 5px; }
 
-h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    color: #c9d1d9;
-}
-
-/* Utilitários de Texto */
-.highlight {
-    color: #58a6ff; /* Azul destaque */
-}
-
-.subtitle {
-    color: #8b949e; /* Cinza claro */
-    font-size: 0.9rem;
-    margin-top: 5px;
-}
-
-/* =========================================
-   BOTÕES GLOBAIS
-   Estilos padrão para todos os botões do app
-   ========================================= */
-
+/* Botões Globais */
 button {
-    background: #238636; /* Verde GitHub */
-    color: white;
-    border: 1px solid rgba(255,255,255,0.1);
-    padding: 8px 15px;
-    cursor: pointer;
-    border-radius: 4px;
-    font-weight: bold;
-    font-family: inherit; /* Herda a fonte do body */
-    transition: background-color 0.2s;
+    background: #238636; color: white; border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold;
+    font-family: inherit; transition: background-color 0.2s;
 }
+button:hover { background: #2ea043; }
+button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; border-color: #30363d; }
 
-button:hover {
-    background: #2ea043;
-}
+.secondary { background: #21262d; border-color: #30363d; color: #c9d1d9; }
+.secondary:hover { background: #30363d; border-color: #8b949e; }
 
-/* Estado Desabilitado */
-button:disabled {
-    background: #21262d;
-    color: #484f58;
-    cursor: not-allowed;
-    border-color: #30363d;
-}
-
-/* Botão Secundário (Cinza) */
-.secondary {
-    background: #21262d;
-    border-color: #30363d;
-    color: #c9d1d9;
-}
-
-.secondary:hover {
-    background: #30363d;
-    border-color: #8b949e;
-}
-
-/* MODAL (OVERLAY) */
+/* MODAL */
 .modal-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85); /* Fundo escuro transparente */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 1000;
 }
-
 .modal-box {
-    background: #161b22;
-    border: 1px solid #30363d;
-    padding: 30px;
-    border-radius: 8px;
-    text-align: center;
-    max-width: 400px;
+    background: #161b22; border: 1px solid #30363d; padding: 30px;
+    border-radius: 8px; text-align: center; max-width: 400px; width: 90%;
     box-shadow: 0 0 30px rgba(0,0,0,0.7);
 }
-
 .modal-icon { font-size: 3rem; margin-bottom: 10px; }
 .modal-box h3 { margin: 10px 0; color: #c9d1d9; }
 .modal-box p { color: #8b949e; margin-bottom: 25px; }
-
-.modal-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
+.modal-actions { display: flex; flex-direction: column; gap: 10px; }
 .btn-restart { background-color: #1f6feb; }
 .btn-restart:hover { background-color: #388bfd; }
 .btn-lobby { border: 1px solid #f85149; color: #f85149; }
 .btn-lobby:hover { background: rgba(218, 54, 51, 0.1); }
+
+/* --- ADAPTAÇÃO MOBILE (Ajuste Global) --- */
+@media (max-width: 768px) {
+    body {
+        padding: 5px; /* Aproveita mais a tela */
+        align-items: flex-start; /* Começa do topo */
+    }
+    
+    .main-container {
+        padding: 15px; /* Menos borda interna */
+        margin-top: 10px;
+        width: 100%;
+        max-width: 100%;
+        border: none; /* Remove borda para parecer app */
+    }
+
+    h1 { font-size: 1.4rem; }
+    .subtitle { font-size: 0.8rem; }
+}
