@@ -3,7 +3,8 @@ const myId = "CLIENT_" + Math.floor(Math.random() * 10000);
 let tcpState = "CLOSED";
 let currentRoom = null;
 
-// Controle TCP
+// Porta Dinâmica
+const myRealPort = Math.floor(Math.random() * (65535 - 49152 + 1)) + 49152;
 let currentSeq = Math.floor(Math.random() * 1000) + 100; 
 let currentAck = 0; 
 
@@ -13,20 +14,22 @@ const workspaceScreen = document.getElementById("workspace-screen");
 const roomNameInput = document.getElementById("room-name");
 const roomPassInput = document.getElementById("room-pass");
 const lobbyMsg = document.getElementById("lobby-msg");
+const listaSalasContainer = document.getElementById("lista-salas-container"); // Novo
 
 // Elementos Simulador
 const packetLayer = document.getElementById("packet-layer");
 const miniLog = document.getElementById("mini-log");
 const msgInput = document.getElementById("msg-input");
 const btnSend = document.getElementById("btn-send-data");
-const btnHandshake = document.getElementById("btn-handshake"); // Novo
-const btnFin = document.getElementById("btn-fin"); // Novo
+const btnHandshake = document.getElementById("btn-handshake"); 
+const btnFin = document.getElementById("btn-fin"); 
 const chatWindow = document.getElementById("chat-window");
 const statusBadge = document.getElementById("status-client");
 const remoteBadge = document.getElementById("status-server");
 const wireLine = document.getElementById("wire-line");
 const msgAguardando = document.getElementById("msg-aguardando");
 const modalOverlay = document.getElementById("modal-overlay");
+const displayMyPort = document.getElementById("display-my-port");
 
 // Inspetor
 const inspSport = document.getElementById("insp-sport");
@@ -40,6 +43,8 @@ const inspPayload = document.getElementById("insp-payload");
 
 // --- 1. CONEXÃO ---
 function conectarWS() {
+    if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
+
     const host = window.location.hostname;
     let url;
     if (window.location.protocol === 'https:') {
@@ -52,7 +57,7 @@ function conectarWS() {
     ws = new WebSocket(url);
 
     ws.onopen = () => {
-        lobbyMsg.innerText = "Conectado ao servidor. Pronto.";
+        lobbyMsg.innerText = "Conectado. Carregando salas...";
         lobbyMsg.style.color = "#3fb950";
     };
 
@@ -60,6 +65,9 @@ function conectarWS() {
         try {
             const msg = JSON.parse(event.data);
             switch (msg.type) {
+                case "ROOM_LIST": 
+                    renderizarListaSalas(msg.rooms);
+                    break;
                 case "ROOM_ACCEPTED":
                     entrarNoSimulador(msg.room_id);
                     if (msg.role === "HOST") {
@@ -80,7 +88,31 @@ function conectarWS() {
     ws.onerror = () => mostrarErroLobby("Erro de Conexão.");
 }
 
-// --- 2. LOBBY ---
+// --- 2. LOBBY E SALAS ---
+function renderizarListaSalas(salas) {
+    listaSalasContainer.innerHTML = ""; 
+    if (salas.length === 0) {
+        listaSalasContainer.innerHTML = '<div class="empty-msg">Nenhuma sala criada.</div>';
+        return;
+    }
+
+    salas.forEach(sala => {
+        const div = document.createElement("div");
+        div.className = "room-item";
+        div.innerHTML = `
+            <span class="room-item-name">${sala}</span>
+            <span class="room-item-action">Selecionar</span>
+        `;
+        div.onclick = () => {
+            roomNameInput.value = sala;
+            roomPassInput.focus();
+            lobbyMsg.innerText = `Sala "${sala}" selecionada. Digite a senha.`;
+            lobbyMsg.style.color = "#58a6ff";
+        };
+        listaSalasContainer.appendChild(div);
+    });
+}
+
 function criarSala() { if(validarWS()) ws.send(JSON.stringify({type: "CREATE_ROOM", room_id: roomNameInput.value, password: roomPassInput.value})); }
 function entrarSala() { if(validarWS()) ws.send(JSON.stringify({type: "JOIN_ROOM", room_id: roomNameInput.value, password: roomPassInput.value})); }
 function validarWS() { if(!ws || ws.readyState!==1) { mostrarErroLobby("Sem conexão."); return false;} return true; }
@@ -93,7 +125,7 @@ function entrarNoSimulador(id) {
     document.getElementById("display-room-name").innerText = id;
 }
 
-// --- 3. LÓGICA TCP (Com FIN-ACK) ---
+// --- 3. LÓGICA TCP ---
 function processarRecebimento(pacote) {
     pacote.tcp_seq = Number(pacote.tcp_seq);
     pacote.tcp_ack = Number(pacote.tcp_ack);
@@ -105,7 +137,6 @@ function processarRecebimento(pacote) {
     
     if (!isNaN(pacote.tcp_seq)) currentAck = pacote.tcp_seq + len;
 
-    // MÁQUINA DE ESTADOS
     switch (tcpState) {
         case "CLOSED":
             if (pacote.type === "SYN") {
@@ -113,7 +144,6 @@ function processarRecebimento(pacote) {
                 setTimeout(() => enviarPacote("SYN-ACK"), 1000);
             }
             break;
-
         case "SYN_SENT":
             if (pacote.type === "SYN-ACK") {
                 currentSeq++;
@@ -121,20 +151,15 @@ function processarRecebimento(pacote) {
                 setTimeout(() => enviarPacote("ACK"), 1000);
             }
             break;
-
         case "SYN_RCVD":
             if (pacote.type === "ACK") mudarEstado("ESTABLISHED");
             break;
-
         case "ESTABLISHED":
             if (pacote.type === "DATA") adicionarNoChat(pacote.payload, "received");
             if (pacote.type === "FIN") {
-                // O outro quer sair. Iniciamos o fechamento passivo.
                 mudarEstado("CLOSE_WAIT");
-                // 1. Envia ACK do FIN recebido
                 setTimeout(() => {
                     enviarPacote("ACK");
-                    // 2. Envia nosso próprio FIN logo depois (simulando app fechando)
                     setTimeout(() => {
                         mudarEstado("LAST_ACK");
                         enviarPacote("FIN");
@@ -142,18 +167,14 @@ function processarRecebimento(pacote) {
                 }, 500);
             }
             break;
-
-        // --- ESTADOS DE ENCERRAMENTO (Quem pediu pra sair) ---
         case "FIN_WAIT_1":
             if (pacote.type === "ACK") mudarEstado("FIN_WAIT_2");
             if (pacote.type === "FIN") {
-                // Cruzamento de FINs ou sequência rápida
                 enviarPacote("ACK");
                 mudarEstado("TIME_WAIT");
-                setTimeout(resetarLocalmente, 2000); // Fecha após 2s
+                setTimeout(resetarLocalmente, 2000);
             }
             break;
-
         case "FIN_WAIT_2":
             if (pacote.type === "FIN") {
                 enviarPacote("ACK");
@@ -161,12 +182,8 @@ function processarRecebimento(pacote) {
                 setTimeout(resetarLocalmente, 2000);
             }
             break;
-
-        // --- ESTADOS DE ENCERRAMENTO (Quem recebeu o pedido) ---
         case "LAST_ACK":
-            if (pacote.type === "ACK") {
-                resetarLocalmente(); // Fim do ciclo
-            }
+            if (pacote.type === "ACK") resetarLocalmente();
             break;
     }
 }
@@ -175,13 +192,15 @@ function enviarPacote(tipo, payload = "") {
     let seq = currentSeq;
     let ack = currentAck;
 
-    if (tipo === "SYN" || tipo === "FIN") ack = 0; // Simplificação
+    if (tipo === "SYN" || tipo === "FIN") ack = 0;
     if (tipo === "DATA") currentSeq += payload.length;
-    if (tipo === "SYN" || tipo === "FIN") currentSeq++; // Consome 1 seq
+    if (tipo === "SYN" || tipo === "FIN") currentSeq++; 
 
     const pacote = { 
         type: tipo, original_sender_id: myId, payload: payload,
-        tcp_seq: seq, tcp_ack: ack, tcp_sport: 50124, tcp_dport: 80
+        tcp_seq: seq, tcp_ack: ack, 
+        tcp_sport: myRealPort, 
+        tcp_dport: 80 
     };
 
     atualizarInspetor(pacote);
@@ -194,7 +213,6 @@ function mudarEstado(novo) {
     statusBadge.innerText = novo; 
     statusBadge.className = `status-badge ${novo}`;
     
-    // Controle dos Botões
     if (novo === "ESTABLISHED") {
         wireLine.classList.add("connected");
         remoteBadge.innerText = "ESTABLISHED"; remoteBadge.className="status-badge ESTABLISHED";
@@ -202,20 +220,16 @@ function mudarEstado(novo) {
         msgInput.placeholder="Digite mensagem...";
         msgAguardando.style.display="none";
     } else if (novo === "CLOSED") {
-        // Estado inicial
         btnHandshake.disabled=false; btnFin.disabled=true;
     } else {
-        // Estados de transição (Handshake ou Teardown)
         btnHandshake.disabled=true; btnFin.disabled=true; msgInput.disabled=true; btnSend.disabled=true;
     }
 }
 
-// --- AÇÕES DO USUÁRIO ---
 function iniciarHandshake() { if (tcpState === "CLOSED") { mudarEstado("SYN_SENT"); enviarPacote("SYN"); } }
 function iniciarFin() { if (tcpState === "ESTABLISHED") { mudarEstado("FIN_WAIT_1"); enviarPacote("FIN"); } }
 function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, "sent"); enviarPacote("DATA", msgInput.value); msgInput.value=""; msgInput.focus(); } }
 
-// --- AUXILIARES ---
 function resetarLocalmente() {
     mudarEstado("CLOSED");
     wireLine.classList.remove("connected");
@@ -250,5 +264,4 @@ function mostrarModalDesconexao() { modalOverlay.style.display="flex"; atualizar
 function voltarLobby() { location.reload(); }
 function reiniciarSala() { modalOverlay.style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
-// Auto-start
 conectarWS();

@@ -18,22 +18,31 @@
         </header>
 
         <div id="lobby-screen">
-            <div class="lobby-box">
-                <h2>Entre na Sala</h2>
-                <div class="input-group">
-                    <label>Nome da Sala:</label>
-                    <input type="text" id="room-name" placeholder="Ex: LabRedes01">
+            <div class="lobby-wrapper">
+                <div class="lobby-box">
+                    <h2>Entre na Sala</h2>
+                    <div class="input-group">
+                        <label>Nome da Sala:</label>
+                        <input type="text" id="room-name" placeholder="Ex: LabRedes01">
+                    </div>
+                    <div class="input-group">
+                        <label>Senha:</label>
+                        <input type="password" id="room-pass" placeholder="Senha da sala">
+                    </div>
+                    
+                    <div class="lobby-actions">
+                        <button onclick="criarSala()" class="btn-create">Criar Sala Privada</button>
+                        <button onclick="entrarSala()" class="btn-join">Entrar em Sala</button>
+                    </div>
+                    <div id="lobby-msg"></div>
                 </div>
-                <div class="input-group">
-                    <label>Senha:</label>
-                    <input type="password" id="room-pass" placeholder="Senha da sala">
+
+                <div class="room-list-box">
+                    <h3>Salas Disponíveis</h3>
+                    <div id="lista-salas-container">
+                        <div class="empty-msg">Carregando salas...</div>
+                    </div>
                 </div>
-                
-                <div class="lobby-actions">
-                    <button onclick="criarSala()" class="btn-create">Criar Sala Privada</button>
-                    <button onclick="entrarSala()" class="btn-join">Entrar em Sala</button>
-                </div>
-                <div id="lobby-msg"></div>
             </div>
         </div>
 
@@ -51,7 +60,7 @@
                             <div class="icon">💻</div>
                             <div class="label">Você</div>
                             <div class="status-badge" id="status-client">CLOSED</div>
-                            <div class="ip-addr">Porta: 50124</div>
+                            <div class="ip-addr" id="display-my-port">Porta: ...</div>
                         </div>
 
                         <div class="wire-container">

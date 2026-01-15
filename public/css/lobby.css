@@ -1,4 +1,3 @@
-/* --- ESTILOS DESKTOP  --- */
 #lobby-screen {
     display: flex;
     justify-content: center;
@@ -6,108 +5,113 @@
     padding: 20px 0;
 }
 
-.lobby-box {
-    background: #21262d;
-    padding: 30px;
+.lobby-wrapper {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 900px;
+    align-items: stretch;
+}
+
+/* ESTILO UNIFICADO DAS CAIXAS */
+.lobby-box, .room-list-box {
+    background: #21262d; /* Garante que ambos tenham fundo cinza visível */
+    padding: 25px;
     border-radius: 8px;
     border: 1px solid #30363d;
-    width: 100%;
-    max-width: 400px; /* No PC mantém esse limite */
-    text-align: left;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    flex: 1; 
+    display: flex;
+    flex-direction: column;
 }
 
-.lobby-box h2 {
+/* Ajustes da Lista */
+.room-list-box {
+    height: auto; 
+    min-height: 350px;
+}
+
+.room-list-box h3 {
     margin-top: 0;
-    color: #58a6ff;
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 1.5rem;
-}
-
-.input-group { margin-bottom: 15px; }
-
-.input-group label {
-    display: block;
-    font-size: 0.85rem;
-    margin-bottom: 6px;
     color: #8b949e;
-    font-weight: bold;
+    text-align: center;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
 }
 
-.input-group input {
-    width: 100%;
-    padding: 10px;
+#lista-salas-container {
+    overflow-y: auto;
+    flex-grow: 1;
+    max-height: 400px;
+}
+
+/* Item da Lista */
+.room-item {
     background: #0d1117;
     border: 1px solid #30363d;
-    color: #fff;
+    padding: 12px;
+    margin-bottom: 8px;
     border-radius: 4px;
-    box-sizing: border-box;
-    font-family: inherit;
-    transition: border-color 0.2s;
-}
-
-.input-group input:focus {
-    border-color: #58a6ff;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
-}
-
-.lobby-actions {
+    cursor: pointer;
+    transition: all 0.2s;
     display: flex;
-    gap: 10px;
-    margin-top: 25px;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.lobby-actions button { flex: 1; }
+.room-item:hover {
+    border-color: #58a6ff;
+    background: #161b22;
+}
 
+.room-item-name { font-weight: bold; color: #58a6ff; }
+.room-item-action { font-size: 0.8rem; color: #8b949e; }
+.empty-msg { text-align: center; color: #484f58; margin-top: 40px; font-style: italic; }
+
+/* Formulário */
+.lobby-box h2 { margin-top: 0; color: #58a6ff; text-align: center; margin-bottom: 20px; font-size: 1.5rem; }
+.input-group { margin-bottom: 15px; width: 100%; }
+.input-group label { display: block; font-size: 0.85rem; margin-bottom: 6px; color: #8b949e; font-weight: bold; }
+.input-group input { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 1rem; transition: border-color 0.2s; }
+.input-group input:focus { border-color: #58a6ff; outline: none; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1); }
+
+.lobby-actions { display: flex; gap: 10px; margin-top: 25px; }
+.lobby-actions button { flex: 1; }
 .btn-create { background-color: #1f6feb; border-color: rgba(255,255,255,0.1); }
 .btn-create:hover { background-color: #388bfd; }
-
 .btn-join { background-color: #238636; }
-
-.btn-exit {
-    background-color: #da3633;
-    border-color: #f85149;
-    color: white;
-}
+.btn-exit { background-color: #da3633; border-color: #f85149; color: white; }
 .btn-exit:hover { background-color: #b62324; }
+#lobby-msg { margin-top: 15px; text-align: center; font-size: 0.8rem; min-height: 20px; font-weight: bold; }
 
-#lobby-msg {
-    margin-top: 15px;
-    text-align: center;
-    font-size: 0.8rem;
-    min-height: 20px;
-    font-weight: bold;
-}
-
-/* --- ADAPTAÇÃO MOBILE (A Mágica acontece aqui) --- */
+/* --- MOBILE: EMPILHAMENTO E CORREÇÃO DE SOBREPOSIÇÃO --- */
 @media (max-width: 768px) {
-    #lobby-screen {
-        padding: 10px; /* Menos borda */
-        align-items: center;
-        min-height: 60vh; /* Centraliza verticalmente */
+    #lobby-screen { 
+        padding: 5px; 
+        margin-top: 20px; /* <--- MARGEM DE SEGURANÇA EXTRA */
+    }
+    
+    .lobby-wrapper {
+        flex-direction: column;
+        gap: 20px; /* Mais espaço entre o form e a lista */
     }
 
-    .lobby-box {
-        max-width: 100%; /* Ocupa a largura total disponível */
-        padding: 20px;
+    .lobby-box, .room-list-box {
+        width: 100%;
+        min-height: auto;
+        flex: none;
+        box-sizing: border-box;
     }
 
-    /* Inputs maiores para dedo */
-    .input-group input {
-        padding: 15px; 
-        font-size: 16px; /* Evita zoom no iPhone */
+    /* Lista vai para baixo e com altura limitada */
+    .room-list-box {
+        order: 2;
+        max-height: 300px;
     }
-
-    /* Botões Empilhados e Grandes */
-    .lobby-actions {
-        flex-direction: column; /* Um embaixo do outro */
-        gap: 15px;
-    }
-
-    .lobby-actions button {
-        padding: 15px; /* Mais fácil de tocar */
-        font-size: 1rem;
-    }
+    
+    .lobby-box { order: 1; }
+    
+    .lobby-actions { flex-direction: column; gap: 12px; }
+    .lobby-actions button { padding: 15px; }
 }

@@ -26,7 +26,7 @@ body {
 }
 
 /* Cabeçalho */
-header { margin-bottom: 20px; text-align: center; }
+header { margin-bottom: 20px; text-align: center; flex-shrink: 0;}
 h1 { margin: 0; font-size: 1.8rem; color: #c9d1d9; }
 .highlight { color: #58a6ff; }
 .subtitle { color: #8b949e; font-size: 0.9rem; margin-top: 5px; }
