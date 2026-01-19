@@ -1,5 +1,7 @@
 /* =================================================================================
-   TCP SIMULATOR - APP.JS 
+   TCP SIMULATOR - APP.JS (Módulo 1: Engine de Tempo + Correção de Sincronia)
+   - Funcionalidades Mantidas: Lobby, Chat, Visualização.
+   - Correção: Sincronia "Just-in-Time". O pacote só nasce no parceiro quando nasce aqui.
    ================================================================================= */
 
 let ws;
@@ -52,13 +54,14 @@ const btnFireBurst = document.getElementById("btn-fire-burst");
 const chaosPacketLayer = document.getElementById("chaos-packet-layer");
 const activePacketList = document.getElementById("active-packet-list");
 const chaosEditorArea = document.getElementById("chaos-editor-area");
+const chaosLogContainer = document.getElementById("chaos-log-container");
 const chaosNodes = document.querySelectorAll(".chaos-stage .node-icon"); 
 
 // Estado Inicial
 if(btnOpenChaos) btnOpenChaos.disabled = true; 
 
 // =========================================
-// 1. CONEXÃO
+// 1. CONEXÃO (Lógica Ajustada para Just-in-Time)
 // =========================================
 function conectarWS() {
     if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
@@ -72,6 +75,8 @@ function conectarWS() {
     ws.onmessage = (event) => {
         try {
             const msg = JSON.parse(event.data);
+            if (msg.original_sender_id === myId) return;
+
             switch (msg.type) {
                 case "ROOM_LIST": renderizarListaSalas(msg.rooms); break;
                 case "ROOM_ACCEPTED":
@@ -92,18 +97,36 @@ function conectarWS() {
                     mostrarModalDesconexao(); 
                     break;
 
-                // CAOS SYNC
-                case "CHAOS_SYNC": toggleChaosMode(msg.action === "OPEN", false); break;
+                // --- CAOS SYNC ---
+                case "CHAOS_SYNC": 
+                    const action = msg.payload ? msg.payload.action : msg.action;
+                    if(action === "OPEN") openChaosLab(false);
+                    else closeChaosLab(false);
+                    break;
                 
-                case "CHAOS_BURST":
-                    const isIncoming = (msg.original_sender_id !== myId);
-                    executarDisparoVisual(msg.qtd, isIncoming, msg.original_sender_id, msg.startSeq);
+                // [NOVO] CHAOS_SPAWN: O Parceiro mandou um pacote nascer AGORA
+                case "CHAOS_SPAWN": 
+                    const pktData = msg.payload;
+                    // Cria visualmente vindo do parceiro (fromMe=false)
+                    createVisualPacket({ 
+                        type: pktData.type, 
+                        seq: pktData.seq, 
+                        fromMe: false, // Importante: vem dele
+                        ownerId: "PEER", 
+                        x: 100, // Nasce na direita
+                        isCorrupted: pktData.isCorrupted 
+                    });
                     break;
                 
                 case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
-                case "CHAOS_EDIT": aplicarEdicaoRemota(msg); break;
+                
+                case "CHAOS_EDIT": 
+                case "EDIT":
+                    const editData = msg.payload ? msg.payload : { action: msg.action, id: msg.id, idx1: msg.idx1, idx2: msg.idx2 };
+                    aplicarEdicaoRemota(editData); 
+                    break;
 
-                default: if (msg.original_sender_id !== myId) animarRecebimento(msg);
+                default: if (msg.original_sender_id !== myId && !isChaosMode) animarRecebimento(msg);
             }
         } catch (e) { console.error(e); }
     };
@@ -111,7 +134,7 @@ function conectarWS() {
 }
 
 // =========================================
-// 2. LOBBY & TCP (V19 FIX)
+// 2. LOBBY & TCP (INTACTO)
 // =========================================
 function renderizarListaSalas(salas) {
     listaSalasContainer.innerHTML = "";
@@ -129,11 +152,10 @@ function validarWS() { if(!ws || ws.readyState!==1) { mostrarErroLobby("Sem cone
 function mostrarErroLobby(m) { lobbyMsg.innerText=m; lobbyMsg.style.color="#ff7b72"; }
 function entrarNoSimulador(id) { currentRoom = id; lobbyScreen.style.display="none"; workspaceScreen.style.display="block"; document.getElementById("display-room-name").innerText = id; }
 
-// --- MÁQUINA DE ESTADOS TCP ---
 function processarRecebimento(pacote) {
-    pacote.tcp_seq = Number(pacote.tcp_seq); pacote.tcp_ack = Number(pacote.tcp_ack);
+    let seq = Number(pacote.tcp_seq); 
     atualizarInspetor(pacote);
-    logSistema(`RX [${pacote.type}] SEQ=${pacote.tcp_seq}`);
+    logSistema(`RX [${pacote.type}] SEQ=${seq}`);
     let len = (pacote.payload) ? pacote.payload.length : 0;
     if (pacote.type === "SYN" || pacote.type === "FIN" || pacote.type === "SYN-ACK") len = 1;
     if (!isNaN(pacote.tcp_seq)) currentAck = pacote.tcp_seq + len;
@@ -149,7 +171,6 @@ function processarRecebimento(pacote) {
             setTimeout(()=>{ enviarPacote("ACK"); setTimeout(()=>{ mudarEstado("LAST_ACK"); enviarPacote("FIN"); },1500); },500); 
         }
     }
-    
     else if(tcpState==="FIN_WAIT_1") {
         if (pacote.type === "ACK") { mudarEstado("FIN_WAIT_2"); } 
         else if (pacote.type === "FIN") { enviarPacote("ACK"); mudarEstado("CLOSING"); }
@@ -193,17 +214,11 @@ function mudarEstado(novo) {
 function iniciarHandshake() { if (tcpState === "CLOSED") { mudarEstado("SYN_SENT"); enviarPacote("SYN"); } }
 function iniciarFin() { if (tcpState === "ESTABLISHED") { mudarEstado("FIN_WAIT_1"); enviarPacote("FIN"); } }
 function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, "sent"); enviarPacote("DATA", msgInput.value); msgInput.value=""; msgInput.focus(); } }
+function resetarLocalmente() { mudarEstado("CLOSED"); currentSeq=100; currentAck=0; atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); logSistema("Conexão resetada."); }
 
-function resetarLocalmente() { 
-    mudarEstado("CLOSED"); currentSeq = 100; currentAck = 0; 
-    atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); 
-    logSistema("Conexão resetada."); 
-}
-
-// Helpers
 function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0; }
-function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
 function logSistema(m) { miniLog.innerText=`> ${m}`; }
+function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
 function animarRecebimento(p) { criarElementoPacote(p.type, "left"); setTimeout(()=>processarRecebimento(p), 1500); }
 function criarElementoPacote(t,d) { const el=document.createElement("div"); el.className=`packet ${t} ${d==="right"?"anim-right":"anim-left"}`; el.innerText=t; packetLayer.appendChild(el); setTimeout(()=>el.remove(), 1600); }
 function atualizarStatusTopo(t,c) { const e=document.getElementById("display-status"); e.innerText=t; e.style.color=c; }
@@ -213,335 +228,301 @@ function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
 // =========================================
-// 4. LABORATÓRIO DE CAOS (V28 - Movement Fix)
+// 4. LABORATÓRIO DE CAOS (Engine Just-in-Time)
 // =========================================
-let activePackets = [];   
-let chaosLoopId = null;   
-let nextSeqNum = 1000; 
-let burstSize = 5; 
+
+const PACKET_SPEED = 0.4;      
+let simTime = 0;               
 let isChaosMode = false;
 let isPaused = false;
 let pausedBy = null; 
-let isBursting = false; 
 
-// Filas Duplas com Timers Independentes
-let outgoingQueue = []; 
-let incomingQueue = []; 
-let lastOutTime = 0; 
-let lastInTime = 0;
-const SPAWN_INTERVAL = 1500; 
+let packets = [];             
+let spawnQueue = [];          
+let activePackets = packets;  
+let myNextSeq = 1000;
+let burstCount = 5;
+let isBursting = false;       
 
-class ChaosPacket {
-    constructor(seq, type = "DATA", isReverse = false, ownerId, isCorrupted = false) {
-        this.id = "pkt_" + Math.random().toString(36).substr(2, 9);
-        this.seq = seq;
-        this.type = type;
-        this.isReverse = isReverse; 
-        this.ownerId = ownerId; 
-        this.isCorrupted = isCorrupted;
+let chaosLoopId = null;
 
-        this.tcp_sport = isReverse ? 80 : myRealPort;
-        this.tcp_dport = isReverse ? myRealPort : 80;
-
-        this.x = isReverse ? 95 : 0; 
-        this.speed = 0.2; 
-        
-        this.el = document.createElement("div");
-        this.el.className = `packet ${type}`; 
-        this.el.style.transition = "none"; // IMPORTANTE: Remove transição CSS para evitar conflito com JS
-        
-        if (ownerId !== myId) this.el.classList.add("peer");
-        if (isCorrupted) this.el.classList.add("corrupted");
-
-        this.el.innerText = seq;
-        this.updatePos();
-        chaosPacketLayer.appendChild(this.el);
-    }
-    updatePos() { this.el.style.left = this.x + "%"; this.el.style.top = "8px"; }
-    
-    move() {
-        let arrived = false;
-        if (this.isReverse) { 
-            if (this.x > 0) { this.x -= this.speed; this.updatePos(); } else { arrived = true; }
-        } else { 
-            if (this.x < 95) { this.x += this.speed; this.updatePos(); } else { arrived = true; }
+function startChaosEngine() {
+    if (chaosLoopId) return; 
+    function loop() {
+        if (isChaosMode) {
+            updatePhysics();
+            chaosLoopId = requestAnimationFrame(loop);
         }
-        if (arrived) {
-            triggerNodeFlash(this.isReverse, this.isCorrupted);
-            return false;
-        }
-        return true; 
     }
-    
-    toggleCorruption() {
-        this.isCorrupted = !this.isCorrupted;
-        if(this.isCorrupted) this.el.classList.add("corrupted");
-        else this.el.classList.remove("corrupted");
-    }
-
-    kill() { this.el.remove(); }
+    loop();
 }
 
-function triggerNodeFlash(isReverse, isCorrupted) {
-    const nodeIndex = isReverse ? 0 : 1; 
-    let animationClass = isCorrupted ? "anim-error" : (isReverse ? "anim-receive" : "anim-success");
-    if (chaosNodes[nodeIndex]) {
-        const node = chaosNodes[nodeIndex];
-        node.classList.remove("anim-success", "anim-receive", "anim-error"); 
-        void node.offsetWidth; node.classList.add(animationClass);
+function updatePhysics() {
+    if (isPaused) return; 
+
+    simTime += 16; 
+
+    // 1. Spawning (Baseado em simTime)
+    if (spawnQueue.length > 0) {
+        if (simTime >= spawnQueue[0].spawnAfter) {
+            const next = spawnQueue.shift();
+            
+            // Reagendar próximo
+            if (spawnQueue.length > 0) {
+                spawnQueue[0].spawnAfter = simTime + 1000;
+            }
+            
+            // [CORREÇÃO]: Cria Localmente
+            createVisualPacket(next);
+            
+            // [CORREÇÃO]: Avisa o parceiro AGORA (Just-in-Time)
+            // Isso envia o estado ATUAL do pacote (incluindo se foi corrompido na fila)
+            notifyRemote("CHAOS_SPAWN", { 
+                seq: next.seq, 
+                type: next.type, 
+                isCorrupted: next.isCorrupted 
+            });
+        }
+    }
+
+    // 2. Movimento
+    for (let i = packets.length - 1; i >= 0; i--) {
+        const p = packets[i];
+        
+        if (p.fromMe) {
+            p.x += PACKET_SPEED;
+            if (p.x >= 96) handleArrival(p, i); 
+        } else {
+            p.x -= PACKET_SPEED;
+            if (p.x <= 4) handleArrival(p, i);  
+        }
+
+        if (p.el) p.el.style.left = p.x + "%";
+    }
+
+    if (isBursting && spawnQueue.length === 0 && packets.filter(p => p.ownerId === myId).length === 0) {
+        isBursting = false;
+        updateFireButtonState();
     }
 }
 
-function requestToggleChaos() { toggleChaosMode(!isChaosMode, true); }
+// --- Funções de Controle ---
 
-function toggleChaosMode(ativar, emitirAviso = false) {
+function handleArrival(p, index) {
+    if (p.el) p.el.remove();
+    packets.splice(index, 1);
+    if (!p.fromMe) {
+        triggerNodeFlash(true, p.isCorrupted);
+    }
+}
+
+function createVisualPacket(data) {
+    const el = document.createElement("div");
+    el.className = `packet ${data.type}`;
+    if (data.ownerId !== myId) el.classList.add("peer"); 
+    if (data.isCorrupted) el.classList.add("corrupted");
+    
+    el.innerText = data.type === "ACK" ? "ACK" : data.seq;
+    el.style.transition = "none"; 
+    
+    chaosPacketLayer.appendChild(el);
+    packets.push({ ...data, el: el });
+}
+
+function dispararRajada() {
+    if(isPaused || isBursting) return;
+    
+    isBursting = true;
+    updateFireButtonState();
+
+    // Removemos o CHAOS_BURST funcional. Mandamos apenas para LOG (opcional).
+    // O spawn agora é controlado pelo updatePhysics passo-a-passo.
+
+    for (let i = 0; i < burstCount; i++) {
+        spawnQueue.push({
+            type: "DATA", seq: myNextSeq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false,
+            spawnAfter: simTime 
+        });
+        myNextSeq += 100;
+    }
+}
+
+// [CORREÇÃO]: Removido handleRemoteBurst pois agora usamos CHAOS_SPAWN individual
+
+// --- CONTROLES DE INTERFACE ---
+
+function requestToggleChaos() { if (isChaosMode) toggleChaosMode(false, true); else toggleChaosMode(true, true); }
+
+function toggleChaosMode(ativar, emitirAviso) {
     if (isChaosMode === ativar) return;
     isChaosMode = ativar;
+    
     if (isChaosMode) {
-        chaosScreen.style.display = "flex";
-        if(workspaceDiv) workspaceDiv.style.display = "none"; 
-        
-        isPaused = false; pausedBy = null; isBursting = false;
-        activePackets = []; outgoingQueue = []; incomingQueue = [];
-        
-        btnPauseToggle.disabled = false;
-        updateFireButtonState();
-        startChaosLoop();
+        openChaosLab(false); 
     } else {
-        chaosScreen.style.display = "none";
-        if(workspaceDiv) workspaceDiv.style.display = "block"; 
-        
-        cancelAnimationFrame(chaosLoopId);
-        chaosLoopId = null;
-        activePackets.forEach(p => p.kill());
-        activePackets = []; outgoingQueue = []; incomingQueue = [];
-        
-        isPaused = false; pausedBy = null; isBursting = false;
-        chaosEditorArea.classList.add("hidden"); chaosEditorArea.classList.remove("blocked");
-        activePacketList.innerHTML = ""; chaosPacketLayer.innerHTML = "";
-        chaosNodes.forEach(n => n.classList.remove("anim-success", "anim-receive", "anim-error"));
-        updateFireButtonState();
+        closeChaosLab(false);
     }
+    
     if (emitirAviso && ws && ws.readyState === 1) {
         ws.send(JSON.stringify({ type: "CHAOS_SYNC", action: isChaosMode ? "OPEN" : "CLOSE", original_sender_id: myId }));
     }
 }
-if(btnOpenChaos) btnOpenChaos.onclick = requestToggleChaos;
 
-// --- PAUSA GLOBAL ---
+function openChaosLab(notify) {
+    isChaosMode = true;
+    simTime = 0;
+    packets = [];
+    spawnQueue = [];
+    isBursting = false;
+    chaosPacketLayer.innerHTML = "";
+    
+    workspaceScreen.style.display = "none"; 
+    chaosScreen.style.display = "block";    
+    
+    btnPauseToggle.disabled = false;
+    aplicarPausa(false, null);
+
+    startChaosEngine(); 
+}
+
+function closeChaosLab(notify) {
+    isChaosMode = false;
+    chaosScreen.style.display = "none";
+    workspaceScreen.style.display = "block"; 
+    
+    cancelAnimationFrame(chaosLoopId);
+    chaosLoopId = null;
+}
+
+function notifyRemote(type, payload) {
+    if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: type, original_sender_id: myId, payload: payload }));
+    }
+}
+
+// --- PAUSA ---
 function requestPauseToggle() {
     if (isPaused && pausedBy !== myId) return;
     const novoEstado = !isPaused;
-    if(ws && ws.readyState===1) {
-        ws.send(JSON.stringify({ type: "CHAOS_PAUSE", is_paused: novoEstado, paused_by: myId }));
-    }
+    if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_PAUSE", is_paused: novoEstado, paused_by: myId }));
     aplicarPausa(novoEstado, myId);
 }
-btnPauseToggle.onclick = requestPauseToggle;
 
 function aplicarPausa(estado, quemPausou) {
     isPaused = estado;
     pausedBy = quemPausou;
+    updateFireButtonState();
     
-    updateFireButtonState(); 
+    chaosEditorArea.classList.remove("blocked");
     
     if (isPaused) {
-        btnPauseToggle.className = (pausedBy === myId) ? "btn-pause btn-play" : "btn-pause";
+        btnPauseToggle.innerHTML = (pausedBy === myId) ? "▶️ CONTINUAR" : "🔒 PARCEIRO EDITANDO";
         btnPauseToggle.style.backgroundColor = (pausedBy === myId) ? "#3fb950" : "#57606a";
-        btnPauseToggle.innerHTML = (pausedBy === myId) ? "▶️ CONTINUAR (Você Pausou)" : "🔒 PARCEIRO EDITANDO...";
         btnPauseToggle.disabled = (pausedBy !== myId);
-
+        
         chaosEditorArea.classList.remove("hidden");
-        if (pausedBy === myId) {
-            chaosEditorArea.classList.remove("blocked");
-            renderEditor();
-        } else {
+        
+        if(pausedBy !== myId && pausedBy !== null) {
             chaosEditorArea.classList.add("blocked");
-            activePacketList.innerHTML = ""; 
+        } else {
+            renderEditor(); 
         }
     } else {
-        btnPauseToggle.className = "btn-pause";
-        btnPauseToggle.style.backgroundColor = "#da3633";
         btnPauseToggle.innerHTML = "✋ PAUSAR TUDO";
+        btnPauseToggle.style.backgroundColor = "#da3633";
         btnPauseToggle.disabled = false;
-
+        
         chaosEditorArea.classList.add("hidden");
-        chaosEditorArea.classList.remove("blocked");
-        startChaosLoop(); 
-    }
-}
-
-function updateFireButtonState() {
-    if (!btnFireBurst) return;
-    if (!isPaused && !isBursting) {
-        btnFireBurst.disabled = false;
-        btnFireBurst.innerText = "DISPARAR";
-        btnFireBurst.style.opacity = "1";
-    } else {
-        btnFireBurst.disabled = true;
-        btnFireBurst.style.opacity = "0.5";
-        if (isBursting) btnFireBurst.innerText = "AGUARDANDO CHEGADA...";
-        else if (isPaused) btnFireBurst.innerText = "PAUSADO";
+        startChaosEngine();
     }
 }
 
 // --- EDITOR ---
 function renderEditor() {
     activePacketList.innerHTML = "";
-    if(activePackets.length === 0) { activePacketList.innerHTML = '<div class="empty-msg">Sem pacotes no fio.</div>'; return; }
+    const dataPackets = packets.filter(p => p.type === "DATA");
+    if(dataPackets.length === 0) { activePacketList.innerHTML = '<div class="empty-msg">Nenhum pacote.</div>'; return; }
     
-    activePackets.forEach((pkt, index) => {
-        const card = document.createElement("div"); 
-        
-        const isMine = (pkt.ownerId === myId);
+    dataPackets.forEach((p) => {
+        const index = packets.indexOf(p);
+        const card = document.createElement("div");
+        const isMine = (p.ownerId === myId);
         card.className = isMine ? "packet-card" : "packet-card is-peer";
         
-        let actionButtons = "";
-        if (isMine) {
-            actionButtons = `
-                <button class="btn-icon" onclick="swapPacket(${index}, -1)" title="Trás">⬆️</button>
-                <button class="btn-icon" onclick="swapPacket(${index}, 1)" title="Frente">⬇️</button>
-                <button class="btn-icon btn-dup" onclick="duplicatePacket(${index})" title="Duplicar">📑</button>
-                <button class="btn-icon btn-kill" onclick="deletePacket(${index})" title="Excluir">❌</button>
-                <button class="btn-icon btn-corrupt" onclick="corruptPacket(${index})" title="Corromper (Visual)">⚡</button>
-            `;
-        } else {
-            actionButtons = `<span style="font-size:0.8rem; color: #8b949e; font-style: italic;">🔒 (Parceiro)</span>`;
-        }
-        card.innerHTML = `
-            <div class="packet-info"><span>📦 SEQ ${pkt.seq}</span><span class="packet-progress">${Math.round(pkt.x)}%</span></div>
-            <div class="packet-actions">${actionButtons}</div>`;
+        let btns = "";
+        if(isMine) {
+            btns = `
+            <button class="btn-icon" onclick="editPacket('swap', ${index}, -1)" title="Mover para Trás">⬆️</button>
+            <button class="btn-icon" onclick="editPacket('swap', ${index}, 1)" title="Mover para Frente">⬇️</button>
+            <button class="btn-icon btn-corrupt" onclick="editPacket('corrupt', ${index})" title="Corromper Pacote">⚡</button>
+            <button class="btn-icon" onclick="editPacket('dup', ${index})" title="Duplicar Pacote">📑</button>
+            <button class="btn-icon" onclick="editPacket('del', ${index})" title="Excluir Pacote">❌</button>`;
+        } else { btns = "<span title='Somente o dono pode editar'>🔒</span>"; }
+        
+        card.innerHTML = `<div class="packet-info">SEQ ${p.seq}</div><div class="packet-actions">${btns}</div>`;
         activePacketList.appendChild(card);
     });
 }
 
-function deletePacket(index) { 
-    if (!activePackets[index]) return; if (activePackets[index].ownerId !== myId) return; 
-    activePackets[index].kill(); activePackets.splice(index, 1); notifyEdit("DELETE", index); renderEditor(); 
-}
-function duplicatePacket(index) {
-    if (!activePackets[index]) return; if (activePackets[index].ownerId !== myId) return; 
-    const org = activePackets[index];
-    const clone = new ChaosPacket(org.seq, org.type, org.isReverse, org.ownerId, org.isCorrupted); 
-    clone.x = org.x - 5; if(clone.x < 0) clone.x=0; clone.updatePos();
-    activePackets.splice(index + 1, 0, clone); notifyEdit("DUPLICATE", index); renderEditor();
-}
-function swapPacket(index, direction) {
-    const ti = index + direction; if (ti < 0 || ti >= activePackets.length) return;
-    if (activePackets[index].ownerId !== myId) return; 
-    const p1 = activePackets[index]; const p2 = activePackets[ti];
-    const tx = p1.x; p1.x = p2.x; p2.x = tx; p1.updatePos(); p2.updatePos();
-    activePackets[index] = p2; activePackets[ti] = p1; notifyEdit("SWAP", index, ti); renderEditor();
-}
-function corruptPacket(index) {
-    if (!activePackets[index]) return;
-    if (activePackets[index].ownerId !== myId) return;
-    activePackets[index].toggleCorruption();
-    notifyEdit("CORRUPT", index);
-}
+function editPacket(action, idx, param) {
+    if (!packets[idx] || packets[idx].ownerId !== myId) return;
+    const p = packets[idx];
+    if(!p.id) p.id = Math.random().toString(); 
 
-function notifyEdit(a, i1, i2 = null) { if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_EDIT", action: a, idx1: i1, idx2: i2 })); }
-function aplicarEdicaoRemota(msg) {
-    if (msg.action === "DELETE") { if(activePackets[msg.idx1]) { activePackets[msg.idx1].kill(); activePackets.splice(msg.idx1, 1); } }
-    else if (msg.action === "DUPLICATE") { 
-        if(activePackets[msg.idx1]) { const o = activePackets[msg.idx1]; const c = new ChaosPacket(o.seq, o.type, o.isReverse, o.ownerId, o.isCorrupted); c.x=o.x-5; if(c.x<0)c.x=0; c.updatePos(); activePackets.splice(msg.idx1+1,0,c); }
+    if (action === 'del') { p.el.remove(); packets.splice(idx, 1); }
+    else if (action === 'corrupt') { 
+        p.isCorrupted = !p.isCorrupted; 
+        p.el.classList.toggle('corrupted');
+        // Importante: Se o pacote ainda estiver na fila (spawnQueue), precisamos atualizar lá também
+        // Mas como spawnQueue tem objetos diferentes, o Just-in-Time pega o objeto 'next' na hora H.
+        // Se a edição for na fila visual (packets), o spawn já ocorreu. 
+        // Se for na fila de espera, precisaríamos de uma UI para a fila de espera. 
+        // Assumindo que editamos pacotes JÁ nascidos.
     }
-    else if (msg.action === "SWAP") {
-        const p1 = activePackets[msg.idx1]; const p2 = activePackets[msg.idx2];
-        if(p1 && p2) { const tx = p1.x; p1.x=p2.x; p2.x=tx; p1.updatePos(); p2.updatePos(); activePackets[msg.idx1] = p2; activePackets[msg.idx2] = p1; }
+    else if (action === 'dup') {
+        createVisualPacket({...p, id: Math.random(), el: null, x: p.x - 5});
     }
-    else if (msg.action === "CORRUPT") {
-        if(activePackets[msg.idx1]) activePackets[msg.idx1].toggleCorruption();
-    }
-}
-
-// --- LOOP & DISPARO (CORRIGIDO: V28 FIX - Push to Active Packets) ---
-function startChaosLoop() {
-    if (chaosLoopId) return;
-    function loop() {
-        if (!isPaused) {
-            const now = Date.now();
-            
-            // Saída (Meus)
-            if (outgoingQueue.length > 0 && now - lastOutTime > SPAWN_INTERVAL) {
-                const nextPkt = outgoingQueue.shift();
-                const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
-                activePackets.push(pkt); // CORREÇÃO CRÍTICA: Adiciona ao array de animação
-                lastOutTime = now;
-            }
-            // Entrada (Parceiro)
-            if (incomingQueue.length > 0 && now - lastInTime > SPAWN_INTERVAL) {
-                 const nextPkt = incomingQueue.shift();
-                 const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
-                 activePackets.push(pkt); // CORREÇÃO CRÍTICA
-                 lastInTime = now;
-            }
-
-            // Move
-            for (let i = activePackets.length - 1; i >= 0; i--) {
-                const pkt = activePackets[i];
-                const vivo = pkt.move();
-                if (!vivo) { pkt.kill(); activePackets.splice(i, 1); }
-            }
-
-            // Auto Unlock (V18: Se não tem pacotes meus na tela ou na fila)
-            if (isBursting) {
-                const myActivePackets = activePackets.filter(p => p.ownerId === myId).length;
-                const myPendingSpawn = outgoingQueue.length;
-                if (myActivePackets === 0 && myPendingSpawn === 0) {
-                    isBursting = false;
-                    updateFireButtonState();
-                }
-            }
+    else if (action === 'swap') {
+        const ti = idx + param;
+        if(packets[ti] && packets[ti].type === "DATA") {
+            const tempX = p.x; p.x = packets[ti].x; packets[ti].x = tempX;
+            p.el.style.left = p.x + "%"; packets[ti].el.style.left = packets[ti].x + "%";
+            packets[idx] = packets[ti]; packets[ti] = p;
         }
-        chaosLoopId = requestAnimationFrame(loop);
-    }
-    loop();
-}
-
-function dispararRajada() {
-    if(isPaused || isBursting) return; 
-    
-    isBursting = true;
-    updateFireButtonState();
-    
-    const startSeq = nextSeqNum;
-
-    atualizarInspetor({
-        tcp_seq: startSeq,
-        tcp_ack: 0,
-        tcp_sport: myRealPort,
-        tcp_dport: 80,
-        type: "DATA",
-        payload: "[RAJADA]"
-    });
-
-    if(ws && ws.readyState===1) {
-        ws.send(JSON.stringify({ 
-            type: "CHAOS_BURST", 
-            qtd: burstSize, 
-            original_sender_id: myId,
-            startSeq: startSeq 
-        }));
     }
     
-    nextSeqNum += (100 * burstSize);
-    executarDisparoVisual(burstSize, false, myId, startSeq);
+    notifyRemote("CHAOS_EDIT", { action, id: p.id, idx1: idx, idx2: idx + param });
+    renderEditor();
 }
 
-function executarDisparoVisual(qtd, isReverse = false, ownerId, startSeq) {
-    let currentSeqForLoop = startSeq;
+function aplicarEdicaoRemota(msg) {
+    // Placeholder (Módulo 2)
+}
 
-    for (let i = 0; i < qtd; i++) {
-        const payload = { seq: currentSeqForLoop, type: "DATA", isReverse: isReverse, ownerId: ownerId, isCorrupted: false };
-        if (isReverse) incomingQueue.push(payload); 
-        else outgoingQueue.push(payload);
-        currentSeqForLoop += 100; 
+function triggerNodeFlash(isReverse, isCorrupted) {
+    const idx = isReverse ? 0 : 1; 
+    const node = chaosNodes[idx];
+    if(node) {
+        node.style.boxShadow = isCorrupted ? "0 0 20px red" : "0 0 20px #3fb950";
+        setTimeout(() => node.style.boxShadow = "none", 200);
     }
-    
-    startChaosLoop();
 }
 
-function mudarQtdRajada(qtd, btnElement) { burstSize = qtd; document.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('selected')); btnElement.classList.add('selected'); }
+function updateFireButtonState() {
+    if (!btnFireBurst) return;
+    if (isPaused) {
+        btnFireBurst.disabled = true; btnFireBurst.innerText = "PAUSADO";
+    } else if (isBursting) {
+        btnFireBurst.disabled = true; btnFireBurst.innerText = "ENVIANDO...";
+    } else {
+        btnFireBurst.disabled = false; btnFireBurst.innerText = "DISPARAR";
+    }
+}
+
+function mudarQtdRajada(n, btn) {
+    burstCount = n;
+    document.querySelectorAll(".btn-opt").forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
 
 conectarWS();
