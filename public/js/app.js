@@ -480,7 +480,7 @@ function openChaosLab(notify) {
     
     btnPauseToggle.disabled = false;
     aplicarPausa(false, null);
-
+    setupBufferVisual();
     startChaosEngine(); 
 }
 
@@ -642,6 +642,26 @@ function mudarQtdRajada(n, btn) {
     burstCount = n;
     document.querySelectorAll(".btn-opt").forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
+}
+
+// --- MÓDULO 5: VISUAL DO BUFFER ---
+function setupBufferVisual() {
+    try {
+        const nodes = document.querySelectorAll(".node-icon");
+        // O nó do parceiro geralmente é o segundo (índice 1) ou último
+        const peerNode = nodes[nodes.length - 1]; 
+        
+        if (peerNode && !peerNode.querySelector('.chaos-buffer-zone')) {
+            const buf = document.createElement("div");
+            buf.className = "chaos-buffer-zone";
+            // Adiciona classe para animar entrada
+            setTimeout(() => buf.classList.add("visible"), 100);
+            peerNode.appendChild(buf);
+            console.log("Buffer visual criado com sucesso.");
+        }
+    } catch (e) {
+        console.error("Erro ao criar buffer visual:", e);
+    }
 }
 
 conectarWS();

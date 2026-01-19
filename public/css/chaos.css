@@ -52,12 +52,64 @@
     display: flex; align-items: center; 
 }
 
+/* --- MODIFICAÇÃO NECESSÁRIA NO ÍCONE --- */
+/* Encontre sua classe .node-icon atual e garanta que ela tenha position: relative */
 .node-icon { 
+    /* Mantenha suas cores e fontes atuais */
     font-size: 1.2rem; font-weight: bold; color: #8b949e; 
     background: #21262d; padding: 10px 20px; 
-    border-radius: 6px; border: 1px solid #30363d; 
-    z-index: 5; 
+    border-radius: 6px; border: 1px solid #30363d; z-index: 5;
+    
+    /* ADICIONE ISSO: */
+    position: relative; 
 }
+
+/* --- NOVO: ZONA DE BUFFER (Cole no final do arquivo) --- */
+.chaos-buffer-zone {
+    position: absolute;
+    top: -55px;        /* Fica acima do ícone */
+    right: 0;          /* Alinhado à direita do ícone */
+    min-width: 80px;
+    height: 45px;
+    border: 2px dashed #a371f7; /* Roxo */
+    border-radius: 6px;
+    background: rgba(163, 113, 247, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 10px;
+    z-index: 10;
+    transition: all 0.3s ease;
+    opacity: 0; /* Começa invisível, o JS vai mostrar */
+    transform: translateY(10px);
+}
+
+.chaos-buffer-zone.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.chaos-buffer-zone::before {
+    content: "BUFFER";
+    position: absolute; top: -18px; right: 0; 
+    font-size: 0.65rem; font-weight: bold; 
+    color: #a371f7; opacity: 0.9;
+}
+
+/* Estilo para pacotes dentro do buffer */
+.packet.buffered {
+    position: relative !important; 
+    top: 0 !important; left: 0 !important;
+    transform: scale(0.85); 
+    box-shadow: none !important;
+    margin-left: -15px; /* Empilha um sobre o outro */
+    border: 1px solid rgba(255,255,255,0.5);
+    animation: pulseBuffer 2s infinite;
+}
+.packet.buffered:first-child { margin-left: 0; }
+
+@keyframes pulseBuffer { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
 
 /* --- CONTROLES E BOTÕES --- */
 .chaos-controls {
