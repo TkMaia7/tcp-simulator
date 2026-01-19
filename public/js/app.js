@@ -1,7 +1,7 @@
 /* =================================================================================
-   TCP SIMULATOR - APP.JS (Módulo 1: Engine de Tempo + Correção de Sincronia)
-   - Funcionalidades Mantidas: Lobby, Chat, Visualização.
-   - Correção: Sincronia "Just-in-Time". O pacote só nasce no parceiro quando nasce aqui.
+   TCP SIMULATOR - APP.JS (Módulo 2: Espelho de Edição)
+   - Funcionalidades Mantidas: Lobby, Chat, Engine de Tempo.
+   - Novidade: IDs Sincronizados e Edição Remota (Corrupção, Delete, Swap).
    ================================================================================= */
 
 let ws;
@@ -61,7 +61,7 @@ const chaosNodes = document.querySelectorAll(".chaos-stage .node-icon");
 if(btnOpenChaos) btnOpenChaos.disabled = true; 
 
 // =========================================
-// 1. CONEXÃO (Lógica Ajustada para Just-in-Time)
+// 1. CONEXÃO (Módulo 2: Leitura de ID e Edição)
 // =========================================
 function conectarWS() {
     if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
@@ -97,29 +97,30 @@ function conectarWS() {
                     mostrarModalDesconexao(); 
                     break;
 
-                // --- CAOS SYNC ---
+                // CAOS SYNC
                 case "CHAOS_SYNC": 
                     const action = msg.payload ? msg.payload.action : msg.action;
                     if(action === "OPEN") openChaosLab(false);
                     else closeChaosLab(false);
                     break;
                 
-                // [NOVO] CHAOS_SPAWN: O Parceiro mandou um pacote nascer AGORA
+                // CHAOS_SPAWN (Agora usa o ID enviado pelo parceiro)
                 case "CHAOS_SPAWN": 
                     const pktData = msg.payload;
-                    // Cria visualmente vindo do parceiro (fromMe=false)
                     createVisualPacket({ 
-                        type: pktData.type, 
+                        id: pktData.id,        // [IMPORTANTE] Usa o mesmo ID do remetente
                         seq: pktData.seq, 
-                        fromMe: false, // Importante: vem dele
+                        type: pktData.type, 
+                        fromMe: false, 
                         ownerId: "PEER", 
-                        x: 100, // Nasce na direita
+                        x: 100, 
                         isCorrupted: pktData.isCorrupted 
                     });
                     break;
                 
                 case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
                 
+                // CHAOS_EDIT (Agora processado)
                 case "CHAOS_EDIT": 
                 case "EDIT":
                     const editData = msg.payload ? msg.payload : { action: msg.action, id: msg.id, idx1: msg.idx1, idx2: msg.idx2 };
@@ -228,7 +229,7 @@ function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
 // =========================================
-// 4. LABORATÓRIO DE CAOS (Engine Just-in-Time)
+// 4. LABORATÓRIO DE CAOS (Módulo 2 - Sincronia Total)
 // =========================================
 
 const PACKET_SPEED = 0.4;      
@@ -262,22 +263,24 @@ function updatePhysics() {
 
     simTime += 16; 
 
-    // 1. Spawning (Baseado em simTime)
+    // 1. Spawning com Geração de ID Local e Envio Just-in-Time
     if (spawnQueue.length > 0) {
         if (simTime >= spawnQueue[0].spawnAfter) {
             const next = spawnQueue.shift();
             
-            // Reagendar próximo
+            // Garante ID único para sincronia
+            if (!next.id) next.id = "pkt_" + Math.random().toString(36).substr(2, 9);
+
             if (spawnQueue.length > 0) {
                 spawnQueue[0].spawnAfter = simTime + 1000;
             }
             
-            // [CORREÇÃO]: Cria Localmente
+            // Cria local
             createVisualPacket(next);
             
-            // [CORREÇÃO]: Avisa o parceiro AGORA (Just-in-Time)
-            // Isso envia o estado ATUAL do pacote (incluindo se foi corrompido na fila)
+            // Avisa remoto (COM ID)
             notifyRemote("CHAOS_SPAWN", { 
+                id: next.id,       // [MÓDULO 2] Envia ID
                 seq: next.seq, 
                 type: next.type, 
                 isCorrupted: next.isCorrupted 
@@ -335,9 +338,6 @@ function dispararRajada() {
     isBursting = true;
     updateFireButtonState();
 
-    // Removemos o CHAOS_BURST funcional. Mandamos apenas para LOG (opcional).
-    // O spawn agora é controlado pelo updatePhysics passo-a-passo.
-
     for (let i = 0; i < burstCount; i++) {
         spawnQueue.push({
             type: "DATA", seq: myNextSeq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false,
@@ -346,8 +346,6 @@ function dispararRajada() {
         myNextSeq += 100;
     }
 }
-
-// [CORREÇÃO]: Removido handleRemoteBurst pois agora usamos CHAOS_SPAWN individual
 
 // --- CONTROLES DE INTERFACE ---
 
@@ -437,7 +435,8 @@ function aplicarPausa(estado, quemPausou) {
     }
 }
 
-// --- EDITOR ---
+// --- EDITOR & APLICAÇÃO REMOTA (Módulo 2) ---
+
 function renderEditor() {
     activePacketList.innerHTML = "";
     const dataPackets = packets.filter(p => p.type === "DATA");
@@ -467,20 +466,16 @@ function renderEditor() {
 function editPacket(action, idx, param) {
     if (!packets[idx] || packets[idx].ownerId !== myId) return;
     const p = packets[idx];
-    if(!p.id) p.id = Math.random().toString(); 
+    if(!p.id) p.id = "pkt_" + Math.random().toString(36).substr(2, 9); // Garante ID
 
+    // Aplica Local
     if (action === 'del') { p.el.remove(); packets.splice(idx, 1); }
     else if (action === 'corrupt') { 
         p.isCorrupted = !p.isCorrupted; 
-        p.el.classList.toggle('corrupted');
-        // Importante: Se o pacote ainda estiver na fila (spawnQueue), precisamos atualizar lá também
-        // Mas como spawnQueue tem objetos diferentes, o Just-in-Time pega o objeto 'next' na hora H.
-        // Se a edição for na fila visual (packets), o spawn já ocorreu. 
-        // Se for na fila de espera, precisaríamos de uma UI para a fila de espera. 
-        // Assumindo que editamos pacotes JÁ nascidos.
+        p.el.classList.toggle('corrupted'); 
     }
     else if (action === 'dup') {
-        createVisualPacket({...p, id: Math.random(), el: null, x: p.x - 5});
+        createVisualPacket({...p, id: "pkt_" + Math.random().toString(36).substr(2, 9), el: null, x: p.x - 5});
     }
     else if (action === 'swap') {
         const ti = idx + param;
@@ -491,12 +486,50 @@ function editPacket(action, idx, param) {
         }
     }
     
+    // Avisa Remoto (Manda ID)
     notifyRemote("CHAOS_EDIT", { action, id: p.id, idx1: idx, idx2: idx + param });
     renderEditor();
 }
 
-function aplicarEdicaoRemota(msg) {
-    // Placeholder (Módulo 2)
+function aplicarEdicaoRemota(data) {
+    // 1. Tenta achar pelo ID (Mais seguro)
+    let idx = packets.findIndex(p => p.id === data.id);
+    
+    // 2. Fallback para swap (que usa índice) ou se ID falhar
+    if (idx === -1 && data.action !== 'swap') {
+        // Se não achou por ID, tenta por posição (idx1) se for confiável
+        if (packets[data.idx1]) idx = data.idx1; 
+        else return; // Pacote não encontrado
+    }
+
+    const p = packets[idx];
+
+    if (data.action === 'corrupt') {
+        p.isCorrupted = !p.isCorrupted;
+        p.el.classList.toggle('corrupted');
+    }
+    else if (data.action === 'del') {
+        p.el.remove();
+        packets.splice(idx, 1);
+    }
+    else if (data.action === 'dup') {
+        // Duplica visualmente no parceiro
+        createVisualPacket({...p, id: "pkt_" + Math.random().toString(36).substr(2, 9), el: null, x: p.x - 5});
+    }
+    else if (data.action === 'swap') {
+        const idxA = data.idx1;
+        const idxB = data.idx2;
+        if(packets[idxA] && packets[idxB]) {
+             const pktA = packets[idxA];
+             const pktB = packets[idxB];
+             const tempX = pktA.x; pktA.x = pktB.x; pktB.x = tempX;
+             pktA.el.style.left = pktA.x + "%"; pktB.el.style.left = pktB.x + "%";
+             packets[idxA] = pktB; packets[idxB] = pktA;
+        }
+    }
+
+    // Se estiver pausado e com editor aberto, atualiza a lista
+    if(isPaused) renderEditor();
 }
 
 function triggerNodeFlash(isReverse, isCorrupted) {
