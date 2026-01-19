@@ -1,5 +1,5 @@
 /* =================================================================================
-   TCP SIMULATOR - APP.JS (V19 - Corruption & Integrity Check)
+   TCP SIMULATOR - APP.JS 
    ================================================================================= */
 
 let ws;
@@ -94,10 +94,12 @@ function conectarWS() {
 
                 // CAOS SYNC
                 case "CHAOS_SYNC": toggleChaosMode(msg.action === "OPEN", false); break;
+                
                 case "CHAOS_BURST":
                     const isIncoming = (msg.original_sender_id !== myId);
                     executarDisparoVisual(msg.qtd, isIncoming, msg.original_sender_id, msg.startSeq);
                     break;
+                
                 case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
                 case "CHAOS_EDIT": aplicarEdicaoRemota(msg); break;
 
@@ -109,7 +111,7 @@ function conectarWS() {
 }
 
 // =========================================
-// 2. LOBBY & TCP
+// 2. LOBBY & TCP (V19 FIX)
 // =========================================
 function renderizarListaSalas(salas) {
     listaSalasContainer.innerHTML = "";
@@ -127,6 +129,7 @@ function validarWS() { if(!ws || ws.readyState!==1) { mostrarErroLobby("Sem cone
 function mostrarErroLobby(m) { lobbyMsg.innerText=m; lobbyMsg.style.color="#ff7b72"; }
 function entrarNoSimulador(id) { currentRoom = id; lobbyScreen.style.display="none"; workspaceScreen.style.display="block"; document.getElementById("display-room-name").innerText = id; }
 
+// --- MÁQUINA DE ESTADOS TCP ---
 function processarRecebimento(pacote) {
     pacote.tcp_seq = Number(pacote.tcp_seq); pacote.tcp_ack = Number(pacote.tcp_ack);
     atualizarInspetor(pacote);
@@ -137,13 +140,25 @@ function processarRecebimento(pacote) {
     
     if(tcpState==="CLOSED" && pacote.type==="SYN") { mudarEstado("SYN_RCVD"); setTimeout(()=>enviarPacote("SYN-ACK"),1000); }
     else if(tcpState==="SYN_SENT" && pacote.type==="SYN-ACK") { currentSeq++; mudarEstado("ESTABLISHED"); setTimeout(()=>enviarPacote("ACK"),1000); }
-    else if(tcpState==="SYN_RCVD" && pacote.type==="ACK") mudarEstado("ESTABLISHED");
+    else if(tcpState==="SYN_RCVD" && pacote.type==="ACK") { mudarEstado("ESTABLISHED"); }
+    
     else if(tcpState==="ESTABLISHED") {
         if(pacote.type==="DATA") adicionarNoChat(pacote.payload, "received");
-        if(pacote.type==="FIN") { mudarEstado("CLOSE_WAIT"); setTimeout(()=>{ enviarPacote("ACK"); setTimeout(()=>{ mudarEstado("LAST_ACK"); enviarPacote("FIN"); },1500); },500); }
+        if(pacote.type==="FIN") { 
+            mudarEstado("CLOSE_WAIT"); 
+            setTimeout(()=>{ enviarPacote("ACK"); setTimeout(()=>{ mudarEstado("LAST_ACK"); enviarPacote("FIN"); },1500); },500); 
+        }
     }
-    else if(tcpState==="FIN_WAIT_1" && (pacote.type==="ACK"||pacote.type==="FIN")) { if(pacote.type==="FIN") enviarPacote("ACK"); mudarEstado("FIN_WAIT_2"); }
-    else if(tcpState==="LAST_ACK" && pacote.type==="ACK") resetarLocalmente();
+    
+    else if(tcpState==="FIN_WAIT_1") {
+        if (pacote.type === "ACK") { mudarEstado("FIN_WAIT_2"); } 
+        else if (pacote.type === "FIN") { enviarPacote("ACK"); mudarEstado("CLOSING"); }
+    }
+    else if(tcpState==="FIN_WAIT_2" && pacote.type==="FIN") {
+        enviarPacote("ACK"); mudarEstado("TIME_WAIT");
+        setTimeout(() => resetarLocalmente(), 2000); 
+    }
+    else if(tcpState==="LAST_ACK" && pacote.type==="ACK") { resetarLocalmente(); }
 }
 
 function enviarPacote(tipo, payload = "") {
@@ -164,8 +179,12 @@ function mudarEstado(novo) {
         msgInput.placeholder="Digite mensagem..."; if(msgAguardando) msgAguardando.style.display="none"; 
         btnOpenChaos.disabled = false; 
     } else if (novo === "CLOSED") {
-        btnHandshake.disabled=false; btnFin.disabled=true; btnOpenChaos.disabled = true; 
-        if(isChaosMode) toggleChaosMode(false, true); 
+        wireLine.classList.remove("connected");
+        remoteBadge.innerText = "LISTENING"; remoteBadge.className="status-badge";
+        btnHandshake.disabled=false; btnFin.disabled=true; 
+        msgInput.disabled=true; btnSend.disabled=true; btnOpenChaos.disabled = true; 
+        msgInput.placeholder="Conecte para digitar..."; if(msgAguardando) msgAguardando.style.display="block";
+        if(isChaosMode) toggleChaosMode(false, true);
     } else {
         btnHandshake.disabled=true; btnFin.disabled=true; msgInput.disabled=true; btnSend.disabled=true; btnOpenChaos.disabled = true;
     }
@@ -174,13 +193,15 @@ function mudarEstado(novo) {
 function iniciarHandshake() { if (tcpState === "CLOSED") { mudarEstado("SYN_SENT"); enviarPacote("SYN"); } }
 function iniciarFin() { if (tcpState === "ESTABLISHED") { mudarEstado("FIN_WAIT_1"); enviarPacote("FIN"); } }
 function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, "sent"); enviarPacote("DATA", msgInput.value); msgInput.value=""; msgInput.focus(); } }
-function resetarLocalmente() { mudarEstado("CLOSED"); wireLine.classList.remove("connected"); remoteBadge.innerText = "LISTENING"; remoteBadge.className="status-badge"; currentSeq=100; currentAck=0; logSistema("Reset."); atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); }
 
-// Helpers
-function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; 
-inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0;
+function resetarLocalmente() { 
+    mudarEstado("CLOSED"); currentSeq = 100; currentAck = 0; 
+    atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); 
+    logSistema("Conexão resetada."); 
 }
 
+// Helpers
+function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0; }
 function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
 function logSistema(m) { miniLog.innerText=`> ${m}`; }
 function animarRecebimento(p) { criarElementoPacote(p.type, "left"); setTimeout(()=>processarRecebimento(p), 1500); }
@@ -192,21 +213,21 @@ function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
 // =========================================
-// 4. LABORATÓRIO DE CAOS (V19 - Corruption)
+// 4. LABORATÓRIO DE CAOS (V28 - Movement Fix)
 // =========================================
 let activePackets = [];   
 let chaosLoopId = null;   
+let nextSeqNum = 1000; 
 let burstSize = 5; 
 let isChaosMode = false;
 let isPaused = false;
 let pausedBy = null; 
 let isBursting = false; 
 
-// Sequência
-let myNextChaosSeq = 1000; 
+// Filas Duplas com Timers Independentes
 let outgoingQueue = []; 
 let incomingQueue = []; 
-let lastOutTime = 0;
+let lastOutTime = 0; 
 let lastInTime = 0;
 const SPAWN_INTERVAL = 1500; 
 
@@ -217,7 +238,7 @@ class ChaosPacket {
         this.type = type;
         this.isReverse = isReverse; 
         this.ownerId = ownerId; 
-        this.isCorrupted = isCorrupted; // Novo Estado
+        this.isCorrupted = isCorrupted;
 
         this.tcp_sport = isReverse ? 80 : myRealPort;
         this.tcp_dport = isReverse ? myRealPort : 80;
@@ -227,8 +248,8 @@ class ChaosPacket {
         
         this.el = document.createElement("div");
         this.el.className = `packet ${type}`; 
+        this.el.style.transition = "none"; // IMPORTANTE: Remove transição CSS para evitar conflito com JS
         
-        // Aplica classes visuais
         if (ownerId !== myId) this.el.classList.add("peer");
         if (isCorrupted) this.el.classList.add("corrupted");
 
@@ -246,14 +267,12 @@ class ChaosPacket {
             if (this.x < 95) { this.x += this.speed; this.updatePos(); } else { arrived = true; }
         }
         if (arrived) {
-            // CORREÇÃO: Passa o estado de corrupção para o flash
             triggerNodeFlash(this.isReverse, this.isCorrupted);
             return false;
         }
         return true; 
     }
     
-    // Novo método para alternar corrupção
     toggleCorruption() {
         this.isCorrupted = !this.isCorrupted;
         if(this.isCorrupted) this.el.classList.add("corrupted");
@@ -265,10 +284,7 @@ class ChaosPacket {
 
 function triggerNodeFlash(isReverse, isCorrupted) {
     const nodeIndex = isReverse ? 0 : 1; 
-    
-    // Se estiver corrompido, usa animação de ERRO, independente da direção
     let animationClass = isCorrupted ? "anim-error" : (isReverse ? "anim-receive" : "anim-success");
-
     if (chaosNodes[nodeIndex]) {
         const node = chaosNodes[nodeIndex];
         node.classList.remove("anim-success", "anim-receive", "anim-error"); 
@@ -286,7 +302,7 @@ function toggleChaosMode(ativar, emitirAviso = false) {
         if(workspaceDiv) workspaceDiv.style.display = "none"; 
         
         isPaused = false; pausedBy = null; isBursting = false;
-        activePackets = []; outgoingQueue = []; incomingQueue = []; 
+        activePackets = []; outgoingQueue = []; incomingQueue = [];
         
         btnPauseToggle.disabled = false;
         updateFireButtonState();
@@ -376,6 +392,7 @@ function renderEditor() {
     
     activePackets.forEach((pkt, index) => {
         const card = document.createElement("div"); 
+        
         const isMine = (pkt.ownerId === myId);
         card.className = isMine ? "packet-card" : "packet-card is-peer";
         
@@ -386,7 +403,7 @@ function renderEditor() {
                 <button class="btn-icon" onclick="swapPacket(${index}, 1)" title="Frente">⬇️</button>
                 <button class="btn-icon btn-dup" onclick="duplicatePacket(${index})" title="Duplicar">📑</button>
                 <button class="btn-icon btn-kill" onclick="deletePacket(${index})" title="Excluir">❌</button>
-                <button class="btn-icon btn-corrupt" onclick="corruptPacket(${index})" title="Corromper (Bits)">⚡</button>
+                <button class="btn-icon btn-corrupt" onclick="corruptPacket(${index})" title="Corromper (Visual)">⚡</button>
             `;
         } else {
             actionButtons = `<span style="font-size:0.8rem; color: #8b949e; font-style: italic;">🔒 (Parceiro)</span>`;
@@ -416,16 +433,11 @@ function swapPacket(index, direction) {
     const tx = p1.x; p1.x = p2.x; p2.x = tx; p1.updatePos(); p2.updatePos();
     activePackets[index] = p2; activePackets[ti] = p1; notifyEdit("SWAP", index, ti); renderEditor();
 }
-
-// NOVA FUNÇÃO DE CORRUPÇÃO
 function corruptPacket(index) {
     if (!activePackets[index]) return;
     if (activePackets[index].ownerId !== myId) return;
-
     activePackets[index].toggleCorruption();
-    notifyEdit("CORRUPT", index); // Notifica o parceiro
-    // Não precisa renderEditor completo, mas vamos chamar para garantir consistência
-    // (ou poderíamos apenas mudar o estilo do botão, mas o render é mais seguro)
+    notifyEdit("CORRUPT", index);
 }
 
 function notifyEdit(a, i1, i2 = null) { if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_EDIT", action: a, idx1: i1, idx2: i2 })); }
@@ -439,52 +451,44 @@ function aplicarEdicaoRemota(msg) {
         if(p1 && p2) { const tx = p1.x; p1.x=p2.x; p2.x=tx; p1.updatePos(); p2.updatePos(); activePackets[msg.idx1] = p2; activePackets[msg.idx2] = p1; }
     }
     else if (msg.action === "CORRUPT") {
-        // Aplica corrupção no pacote do parceiro
-        if (activePackets[msg.idx1]) {
-            activePackets[msg.idx1].toggleCorruption();
-        }
+        if(activePackets[msg.idx1]) activePackets[msg.idx1].toggleCorruption();
     }
 }
 
-// --- LOOP & DISPARO ---
+// --- LOOP & DISPARO (CORRIGIDO: V28 FIX - Push to Active Packets) ---
 function startChaosLoop() {
     if (chaosLoopId) return;
     function loop() {
         if (!isPaused) {
             const now = Date.now();
             
-            // 1. Saída (Meus)
-            if (outgoingQueue.length > 0) {
-                if (now - lastOutTime > SPAWN_INTERVAL) {
-                    const nextPkt = outgoingQueue.shift();
-                    const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
-                    activePackets.push(pkt);
-                    lastOutTime = now;
-                }
+            // Saída (Meus)
+            if (outgoingQueue.length > 0 && now - lastOutTime > SPAWN_INTERVAL) {
+                const nextPkt = outgoingQueue.shift();
+                const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
+                activePackets.push(pkt); // CORREÇÃO CRÍTICA: Adiciona ao array de animação
+                lastOutTime = now;
+            }
+            // Entrada (Parceiro)
+            if (incomingQueue.length > 0 && now - lastInTime > SPAWN_INTERVAL) {
+                 const nextPkt = incomingQueue.shift();
+                 const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
+                 activePackets.push(pkt); // CORREÇÃO CRÍTICA
+                 lastInTime = now;
             }
 
-            // 2. Entrada (Parceiro)
-            if (incomingQueue.length > 0) {
-                if (now - lastInTime > SPAWN_INTERVAL) {
-                    const nextPkt = incomingQueue.shift();
-                    const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
-                    activePackets.push(pkt);
-                    lastInTime = now;
-                }
-            }
-
-            // 3. Move
+            // Move
             for (let i = activePackets.length - 1; i >= 0; i--) {
                 const pkt = activePackets[i];
                 const vivo = pkt.move();
                 if (!vivo) { pkt.kill(); activePackets.splice(i, 1); }
             }
 
-            // 4. Auto-Unlock
+            // Auto Unlock (V18: Se não tem pacotes meus na tela ou na fila)
             if (isBursting) {
-                const myActive = activePackets.filter(p => p.ownerId === myId).length;
-                const myPending = outgoingQueue.length;
-                if (myActive === 0 && myPending === 0) {
+                const myActivePackets = activePackets.filter(p => p.ownerId === myId).length;
+                const myPendingSpawn = outgoingQueue.length;
+                if (myActivePackets === 0 && myPendingSpawn === 0) {
                     isBursting = false;
                     updateFireButtonState();
                 }
@@ -501,7 +505,7 @@ function dispararRajada() {
     isBursting = true;
     updateFireButtonState();
     
-    const startSeq = myNextChaosSeq;
+    const startSeq = nextSeqNum;
 
     atualizarInspetor({
         tcp_seq: startSeq,
@@ -521,7 +525,7 @@ function dispararRajada() {
         }));
     }
     
-    myNextChaosSeq += (100 * burstSize);
+    nextSeqNum += (100 * burstSize);
     executarDisparoVisual(burstSize, false, myId, startSeq);
 }
 
@@ -529,12 +533,9 @@ function executarDisparoVisual(qtd, isReverse = false, ownerId, startSeq) {
     let currentSeqForLoop = startSeq;
 
     for (let i = 0; i < qtd; i++) {
-        // IMPORTANTE: isCorrupted começa false por padrão
         const payload = { seq: currentSeqForLoop, type: "DATA", isReverse: isReverse, ownerId: ownerId, isCorrupted: false };
-        
         if (isReverse) incomingQueue.push(payload); 
         else outgoingQueue.push(payload);
-        
         currentSeqForLoop += 100; 
     }
     
