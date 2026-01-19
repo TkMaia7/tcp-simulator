@@ -1,7 +1,7 @@
 /* =================================================================================
-   TCP SIMULATOR - APP.JS (Módulo 2: Espelho de Edição)
-   - Funcionalidades Mantidas: Lobby, Chat, Engine de Tempo.
-   - Novidade: IDs Sincronizados e Edição Remota (Corrupção, Delete, Swap).
+   TCP SIMULATOR - APP.JS (V37: Fix Definitivo do Botão de Rajada)
+   - Lógica: Engine, Sync Just-in-Time, Espelho de Edição, Validação.
+   - CORREÇÃO: Destrava o botão assim que a fila de geração esvazia e os ACKs chegam.
    ================================================================================= */
 
 let ws;
@@ -61,7 +61,7 @@ const chaosNodes = document.querySelectorAll(".chaos-stage .node-icon");
 if(btnOpenChaos) btnOpenChaos.disabled = true; 
 
 // =========================================
-// 1. CONEXÃO (Módulo 2: Leitura de ID e Edição)
+// 1. CONEXÃO
 // =========================================
 function conectarWS() {
     if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
@@ -104,11 +104,11 @@ function conectarWS() {
                     else closeChaosLab(false);
                     break;
                 
-                // CHAOS_SPAWN (Agora usa o ID enviado pelo parceiro)
+                // CHAOS_SPAWN
                 case "CHAOS_SPAWN": 
                     const pktData = msg.payload;
                     createVisualPacket({ 
-                        id: pktData.id,        // [IMPORTANTE] Usa o mesmo ID do remetente
+                        id: pktData.id,
                         seq: pktData.seq, 
                         type: pktData.type, 
                         fromMe: false, 
@@ -120,7 +120,6 @@ function conectarWS() {
                 
                 case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
                 
-                // CHAOS_EDIT (Agora processado)
                 case "CHAOS_EDIT": 
                 case "EDIT":
                     const editData = msg.payload ? msg.payload : { action: msg.action, id: msg.id, idx1: msg.idx1, idx2: msg.idx2 };
@@ -164,7 +163,6 @@ function processarRecebimento(pacote) {
     if(tcpState==="CLOSED" && pacote.type==="SYN") { mudarEstado("SYN_RCVD"); setTimeout(()=>enviarPacote("SYN-ACK"),1000); }
     else if(tcpState==="SYN_SENT" && pacote.type==="SYN-ACK") { currentSeq++; mudarEstado("ESTABLISHED"); setTimeout(()=>enviarPacote("ACK"),1000); }
     else if(tcpState==="SYN_RCVD" && pacote.type==="ACK") { mudarEstado("ESTABLISHED"); }
-    
     else if(tcpState==="ESTABLISHED") {
         if(pacote.type==="DATA") adicionarNoChat(pacote.payload, "received");
         if(pacote.type==="FIN") { 
@@ -229,10 +227,12 @@ function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
 // =========================================
-// 4. LABORATÓRIO DE CAOS (Módulo 2 - Sincronia Total)
+// 4. LABORATÓRIO DE CAOS (FINAL)
 // =========================================
 
 const PACKET_SPEED = 0.4;      
+const TIMEOUT_DURATION = 10000;
+
 let simTime = 0;               
 let isChaosMode = false;
 let isPaused = false;
@@ -245,6 +245,8 @@ let myNextSeq = 1000;
 let burstCount = 5;
 let isBursting = false;       
 
+let unackedData = {};         
+let receivedLog = new Set();  
 let chaosLoopId = null;
 
 function startChaosEngine() {
@@ -263,28 +265,33 @@ function updatePhysics() {
 
     simTime += 16; 
 
-    // 1. Spawning com Geração de ID Local e Envio Just-in-Time
+    // 1. Spawning
     if (spawnQueue.length > 0) {
         if (simTime >= spawnQueue[0].spawnAfter) {
             const next = spawnQueue.shift();
             
-            // Garante ID único para sincronia
             if (!next.id) next.id = "pkt_" + Math.random().toString(36).substr(2, 9);
 
             if (spawnQueue.length > 0) {
                 spawnQueue[0].spawnAfter = simTime + 1000;
             }
             
-            // Cria local
             createVisualPacket(next);
             
-            // Avisa remoto (COM ID)
             notifyRemote("CHAOS_SPAWN", { 
-                id: next.id,       // [MÓDULO 2] Envia ID
+                id: next.id,       
                 seq: next.seq, 
                 type: next.type, 
                 isCorrupted: next.isCorrupted 
             });
+
+            if (next.type === "DATA" && next.fromMe) {
+                unackedData[next.seq] = {
+                    sentTime: simTime,
+                    attempts: 0,
+                    id: next.id
+                };
+            }
         }
     }
 
@@ -303,10 +310,15 @@ function updatePhysics() {
         if (p.el) p.el.style.left = p.x + "%";
     }
 
-    if (isBursting && spawnQueue.length === 0 && packets.filter(p => p.ownerId === myId).length === 0) {
+    // 3. Unlock do Botão (CORRIGIDO: Não espera pacote sair da tela)
+    // Assim que a fila de geração esvazia, sai do modo "ENVIANDO"
+    if (isBursting && spawnQueue.length === 0) {
         isBursting = false;
         updateFireButtonState();
     }
+
+    checkRetransmissions();
+    updateFireButtonState();
 }
 
 // --- Funções de Controle ---
@@ -314,9 +326,86 @@ function updatePhysics() {
 function handleArrival(p, index) {
     if (p.el) p.el.remove();
     packets.splice(index, 1);
+
     if (!p.fromMe) {
-        triggerNodeFlash(true, p.isCorrupted);
+        // --- SE FOR ACK ---
+        if (p.type === "ACK") {
+            if (unackedData[p.seq]) {
+                logChaos(`TX: ACK ${p.seq} recebido. Confirmado.`, "ack");
+                delete unackedData[p.seq]; 
+                updateFireButtonState(); // Atualiza botão imediatamente
+            } 
+            return; 
+        }
+
+        // --- SE FOR DATA ---
+        if (p.isCorrupted) {
+            logChaos(`RX: SEQ ${p.seq} CORROMPIDO! Descartando.`, "error");
+            triggerNodeFlash(true, true); 
+            return; 
+        }
+
+        if (receivedLog.has(p.seq)) {
+            logChaos(`RX: SEQ ${p.seq} Duplicado. Reenviando ACK.`, "warn");
+            triggerNodeFlash(true, false);
+            sendAck(p.seq); 
+            return;
+        }
+
+        logChaos(`RX: SEQ ${p.seq} Recebido com sucesso.`, "recv");
+        receivedLog.add(p.seq); 
+        triggerNodeFlash(true, false); 
+        sendAck(p.seq);
     }
+}
+
+function checkRetransmissions() {
+    for (let seq in unackedData) {
+        let entry = unackedData[seq];
+        
+        if (simTime - entry.sentTime > TIMEOUT_DURATION) {
+            
+            if (entry.attempts >= 3) {
+                logChaos(`TX: Falha persistente no SEQ ${seq}. Desistindo.`, "error");
+                delete unackedData[seq];
+                updateFireButtonState(); // Libera botão se desistir
+                continue;
+            }
+
+            logChaos(`TX: Timeout no SEQ ${seq}. Retransmitindo...`, "warn");
+            
+            const retryPkt = {
+                type: "DATA",
+                seq: parseInt(seq),
+                fromMe: true,
+                ownerId: myId,
+                x: 0,
+                isCorrupted: false,
+                id: "retry_" + Math.random().toString(36).substr(2, 9)
+            };
+
+            createVisualPacket(retryPkt);
+            notifyRemote("CHAOS_SPAWN", retryPkt);
+
+            entry.sentTime = simTime;
+            entry.attempts++;
+        }
+    }
+}
+
+function sendAck(seq) {
+    const ackId = "ack_" + Math.random().toString(36).substr(2, 9);
+    const pkt = {
+        id: ackId,
+        type: "ACK",
+        seq: seq,
+        fromMe: true, 
+        ownerId: myId,
+        x: 0,
+        isCorrupted: false
+    };
+    createVisualPacket(pkt);
+    notifyRemote("CHAOS_SPAWN", pkt);
 }
 
 function createVisualPacket(data) {
@@ -333,10 +422,11 @@ function createVisualPacket(data) {
 }
 
 function dispararRajada() {
-    if(isPaused || isBursting) return;
+    if(isPaused || isBursting || Object.keys(unackedData).length > 0) return;
     
     isBursting = true;
     updateFireButtonState();
+    logChaos(`TX: Iniciando rajada de ${burstCount} pacotes...`, "system");
 
     for (let i = 0; i < burstCount; i++) {
         spawnQueue.push({
@@ -347,7 +437,15 @@ function dispararRajada() {
     }
 }
 
-// --- CONTROLES DE INTERFACE ---
+// --- UTILITÁRIOS ---
+
+function logChaos(text, type="system") {
+    const d = document.createElement("div");
+    d.className = `log-entry ${type}`;
+    d.innerText = `[${Math.floor(simTime/1000)}s] ${text}`;
+    chaosLogContainer.appendChild(d);
+    chaosLogContainer.scrollTop = chaosLogContainer.scrollHeight;
+}
 
 function requestToggleChaos() { if (isChaosMode) toggleChaosMode(false, true); else toggleChaosMode(true, true); }
 
@@ -371,8 +469,11 @@ function openChaosLab(notify) {
     simTime = 0;
     packets = [];
     spawnQueue = [];
+    receivedLog = new Set(); 
+    unackedData = {}; 
     isBursting = false;
     chaosPacketLayer.innerHTML = "";
+    chaosLogContainer.innerHTML = "<div class='log-entry system'>--- Laboratório TCP Iniciado ---</div>";
     
     workspaceScreen.style.display = "none"; 
     chaosScreen.style.display = "block";    
@@ -398,7 +499,7 @@ function notifyRemote(type, payload) {
     }
 }
 
-// --- PAUSA ---
+// --- PAUSA & EDITOR ---
 function requestPauseToggle() {
     if (isPaused && pausedBy !== myId) return;
     const novoEstado = !isPaused;
@@ -435,8 +536,6 @@ function aplicarPausa(estado, quemPausou) {
     }
 }
 
-// --- EDITOR & APLICAÇÃO REMOTA (Módulo 2) ---
-
 function renderEditor() {
     activePacketList.innerHTML = "";
     const dataPackets = packets.filter(p => p.type === "DATA");
@@ -466,9 +565,8 @@ function renderEditor() {
 function editPacket(action, idx, param) {
     if (!packets[idx] || packets[idx].ownerId !== myId) return;
     const p = packets[idx];
-    if(!p.id) p.id = "pkt_" + Math.random().toString(36).substr(2, 9); // Garante ID
+    if(!p.id) p.id = "pkt_" + Math.random().toString(36).substr(2, 9); 
 
-    // Aplica Local
     if (action === 'del') { p.el.remove(); packets.splice(idx, 1); }
     else if (action === 'corrupt') { 
         p.isCorrupted = !p.isCorrupted; 
@@ -486,49 +584,28 @@ function editPacket(action, idx, param) {
         }
     }
     
-    // Avisa Remoto (Manda ID)
     notifyRemote("CHAOS_EDIT", { action, id: p.id, idx1: idx, idx2: idx + param });
     renderEditor();
 }
 
 function aplicarEdicaoRemota(data) {
-    // 1. Tenta achar pelo ID (Mais seguro)
     let idx = packets.findIndex(p => p.id === data.id);
-    
-    // 2. Fallback para swap (que usa índice) ou se ID falhar
     if (idx === -1 && data.action !== 'swap') {
-        // Se não achou por ID, tenta por posição (idx1) se for confiável
-        if (packets[data.idx1]) idx = data.idx1; 
-        else return; // Pacote não encontrado
+        if (packets[data.idx1]) idx = data.idx1; else return; 
     }
-
     const p = packets[idx];
-
-    if (data.action === 'corrupt') {
-        p.isCorrupted = !p.isCorrupted;
-        p.el.classList.toggle('corrupted');
-    }
-    else if (data.action === 'del') {
-        p.el.remove();
-        packets.splice(idx, 1);
-    }
-    else if (data.action === 'dup') {
-        // Duplica visualmente no parceiro
-        createVisualPacket({...p, id: "pkt_" + Math.random().toString(36).substr(2, 9), el: null, x: p.x - 5});
-    }
+    if (data.action === 'corrupt') { p.isCorrupted = !p.isCorrupted; p.el.classList.toggle('corrupted'); }
+    else if (data.action === 'del') { p.el.remove(); packets.splice(idx, 1); }
+    else if (data.action === 'dup') { createVisualPacket({...p, id: "pkt_" + Math.random().toString(36).substr(2, 9), el: null, x: p.x - 5}); }
     else if (data.action === 'swap') {
-        const idxA = data.idx1;
-        const idxB = data.idx2;
+        const idxA = data.idx1; const idxB = data.idx2;
         if(packets[idxA] && packets[idxB]) {
-             const pktA = packets[idxA];
-             const pktB = packets[idxB];
+             const pktA = packets[idxA]; const pktB = packets[idxB];
              const tempX = pktA.x; pktA.x = pktB.x; pktB.x = tempX;
              pktA.el.style.left = pktA.x + "%"; pktB.el.style.left = pktB.x + "%";
              packets[idxA] = pktB; packets[idxB] = pktA;
         }
     }
-
-    // Se estiver pausado e com editor aberto, atualiza a lista
     if(isPaused) renderEditor();
 }
 
@@ -543,11 +620,20 @@ function triggerNodeFlash(isReverse, isCorrupted) {
 
 function updateFireButtonState() {
     if (!btnFireBurst) return;
+    
+    const pendingCount = Object.keys(unackedData).length;
+
     if (isPaused) {
         btnFireBurst.disabled = true; btnFireBurst.innerText = "PAUSADO";
-    } else if (isBursting) {
+    } 
+    else if (pendingCount > 0) {
+        btnFireBurst.disabled = true; 
+        btnFireBurst.innerText = `AGUARDANDO ACKs (${pendingCount})`;
+    } 
+    else if (isBursting) {
         btnFireBurst.disabled = true; btnFireBurst.innerText = "ENVIANDO...";
-    } else {
+    } 
+    else {
         btnFireBurst.disabled = false; btnFireBurst.innerText = "DISPARAR";
     }
 }
