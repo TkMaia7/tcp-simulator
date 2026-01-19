@@ -1,5 +1,5 @@
 /* =================================================================================
-   TCP SIMULATOR - APP.JS (V11 - Spawn Queue System)
+   TCP SIMULATOR - APP.JS (V19 - Corruption & Integrity Check)
    ================================================================================= */
 
 let ws;
@@ -52,6 +52,7 @@ const btnFireBurst = document.getElementById("btn-fire-burst");
 const chaosPacketLayer = document.getElementById("chaos-packet-layer");
 const activePacketList = document.getElementById("active-packet-list");
 const chaosEditorArea = document.getElementById("chaos-editor-area");
+const chaosNodes = document.querySelectorAll(".chaos-stage .node-icon"); 
 
 // Estado Inicial
 if(btnOpenChaos) btnOpenChaos.disabled = true; 
@@ -86,20 +87,19 @@ function conectarWS() {
                     break;
                 case "ERROR": mostrarErroLobby(msg.message); break;
                 case "PEER_JOINED": logSistema("Parceiro entrou!"); notificarConexaoEstabelecida(); break;
-                case "PEER_LEFT": mostrarModalDesconexao(); break;
+                case "PEER_LEFT": 
+                    if(isChaosMode) toggleChaosMode(false, false);
+                    mostrarModalDesconexao(); 
+                    break;
 
                 // CAOS SYNC
                 case "CHAOS_SYNC": toggleChaosMode(msg.action === "OPEN", false); break;
                 case "CHAOS_BURST":
                     const isIncoming = (msg.original_sender_id !== myId);
-                    executarDisparoVisual(msg.qtd, isIncoming);
+                    executarDisparoVisual(msg.qtd, isIncoming, msg.original_sender_id, msg.startSeq);
                     break;
-                case "CHAOS_PAUSE":
-                    aplicarPausa(msg.is_paused, msg.paused_by);
-                    break;
-                case "CHAOS_EDIT":
-                    aplicarEdicaoRemota(msg);
-                    break;
+                case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
+                case "CHAOS_EDIT": aplicarEdicaoRemota(msg); break;
 
                 default: if (msg.original_sender_id !== myId) animarRecebimento(msg);
             }
@@ -177,7 +177,10 @@ function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, 
 function resetarLocalmente() { mudarEstado("CLOSED"); wireLine.classList.remove("connected"); remoteBadge.innerText = "LISTENING"; remoteBadge.className="status-badge"; currentSeq=100; currentAck=0; logSistema("Reset."); atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); }
 
 // Helpers
-function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; }
+function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; 
+inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0;
+}
+
 function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
 function logSistema(m) { miniLog.innerText=`> ${m}`; }
 function animarRecebimento(p) { criarElementoPacote(p.type, "left"); setTimeout(()=>processarRecebimento(p), 1500); }
@@ -189,43 +192,88 @@ function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
 // =========================================
-// 4. LABORATÓRIO DE CAOS (V11 - Spawn Queue)
+// 4. LABORATÓRIO DE CAOS (V19 - Corruption)
 // =========================================
 let activePackets = [];   
 let chaosLoopId = null;   
-let nextSeqNum = 100;     
 let burstSize = 5; 
 let isChaosMode = false;
 let isPaused = false;
 let pausedBy = null; 
+let isBursting = false; 
 
-// --- NOVA ESTRUTURA DE FILA ---
-let spawnQueue = []; 
-let lastSpawnTime = 0; 
-const SPAWN_INTERVAL = 1500; // Tempo entre pacotes
+// Sequência
+let myNextChaosSeq = 1000; 
+let outgoingQueue = []; 
+let incomingQueue = []; 
+let lastOutTime = 0;
+let lastInTime = 0;
+const SPAWN_INTERVAL = 1500; 
 
 class ChaosPacket {
-    constructor(seq, type = "DATA", isReverse = false) {
+    constructor(seq, type = "DATA", isReverse = false, ownerId, isCorrupted = false) {
         this.id = "pkt_" + Math.random().toString(36).substr(2, 9);
         this.seq = seq;
         this.type = type;
         this.isReverse = isReverse; 
+        this.ownerId = ownerId; 
+        this.isCorrupted = isCorrupted; // Novo Estado
+
+        this.tcp_sport = isReverse ? 80 : myRealPort;
+        this.tcp_dport = isReverse ? myRealPort : 80;
+
         this.x = isReverse ? 95 : 0; 
         this.speed = 0.2; 
         
         this.el = document.createElement("div");
         this.el.className = `packet ${type}`; 
+        
+        // Aplica classes visuais
+        if (ownerId !== myId) this.el.classList.add("peer");
+        if (isCorrupted) this.el.classList.add("corrupted");
+
         this.el.innerText = seq;
         this.updatePos();
         chaosPacketLayer.appendChild(this.el);
     }
     updatePos() { this.el.style.left = this.x + "%"; this.el.style.top = "8px"; }
+    
     move() {
-        if (this.isReverse) { if (this.x > 0) { this.x -= this.speed; this.updatePos(); return true; } } 
-        else { if (this.x < 95) { this.x += this.speed; this.updatePos(); return true; } }
-        return false;
+        let arrived = false;
+        if (this.isReverse) { 
+            if (this.x > 0) { this.x -= this.speed; this.updatePos(); } else { arrived = true; }
+        } else { 
+            if (this.x < 95) { this.x += this.speed; this.updatePos(); } else { arrived = true; }
+        }
+        if (arrived) {
+            // CORREÇÃO: Passa o estado de corrupção para o flash
+            triggerNodeFlash(this.isReverse, this.isCorrupted);
+            return false;
+        }
+        return true; 
     }
+    
+    // Novo método para alternar corrupção
+    toggleCorruption() {
+        this.isCorrupted = !this.isCorrupted;
+        if(this.isCorrupted) this.el.classList.add("corrupted");
+        else this.el.classList.remove("corrupted");
+    }
+
     kill() { this.el.remove(); }
+}
+
+function triggerNodeFlash(isReverse, isCorrupted) {
+    const nodeIndex = isReverse ? 0 : 1; 
+    
+    // Se estiver corrompido, usa animação de ERRO, independente da direção
+    let animationClass = isCorrupted ? "anim-error" : (isReverse ? "anim-receive" : "anim-success");
+
+    if (chaosNodes[nodeIndex]) {
+        const node = chaosNodes[nodeIndex];
+        node.classList.remove("anim-success", "anim-receive", "anim-error"); 
+        void node.offsetWidth; node.classList.add(animationClass);
+    }
 }
 
 function requestToggleChaos() { toggleChaosMode(!isChaosMode, true); }
@@ -237,10 +285,11 @@ function toggleChaosMode(ativar, emitirAviso = false) {
         chaosScreen.style.display = "flex";
         if(workspaceDiv) workspaceDiv.style.display = "none"; 
         
-        isPaused = false;
-        pausedBy = null;
-        atualizarBotaoPause();
+        isPaused = false; pausedBy = null; isBursting = false;
+        activePackets = []; outgoingQueue = []; incomingQueue = []; 
         
+        btnPauseToggle.disabled = false;
+        updateFireButtonState();
         startChaosLoop();
     } else {
         chaosScreen.style.display = "none";
@@ -248,16 +297,14 @@ function toggleChaosMode(ativar, emitirAviso = false) {
         
         cancelAnimationFrame(chaosLoopId);
         chaosLoopId = null;
-        
-        // Limpa tudo (Pacotes e Fila Pendente)
         activePackets.forEach(p => p.kill());
-        activePackets = [];
-        spawnQueue = []; 
+        activePackets = []; outgoingQueue = []; incomingQueue = [];
         
-        isPaused = false; pausedBy = null;
+        isPaused = false; pausedBy = null; isBursting = false;
         chaosEditorArea.classList.add("hidden"); chaosEditorArea.classList.remove("blocked");
         activePacketList.innerHTML = ""; chaosPacketLayer.innerHTML = "";
-        atualizarBotaoPause();
+        chaosNodes.forEach(n => n.classList.remove("anim-success", "anim-receive", "anim-error"));
+        updateFireButtonState();
     }
     if (emitirAviso && ws && ws.readyState === 1) {
         ws.send(JSON.stringify({ type: "CHAOS_SYNC", action: isChaosMode ? "OPEN" : "CLOSE", original_sender_id: myId }));
@@ -279,9 +326,15 @@ btnPauseToggle.onclick = requestPauseToggle;
 function aplicarPausa(estado, quemPausou) {
     isPaused = estado;
     pausedBy = quemPausou;
-    atualizarBotaoPause();
-
+    
+    updateFireButtonState(); 
+    
     if (isPaused) {
+        btnPauseToggle.className = (pausedBy === myId) ? "btn-pause btn-play" : "btn-pause";
+        btnPauseToggle.style.backgroundColor = (pausedBy === myId) ? "#3fb950" : "#57606a";
+        btnPauseToggle.innerHTML = (pausedBy === myId) ? "▶️ CONTINUAR (Você Pausou)" : "🔒 PARCEIRO EDITANDO...";
+        btnPauseToggle.disabled = (pausedBy !== myId);
+
         chaosEditorArea.classList.remove("hidden");
         if (pausedBy === myId) {
             chaosEditorArea.classList.remove("blocked");
@@ -291,32 +344,28 @@ function aplicarPausa(estado, quemPausou) {
             activePacketList.innerHTML = ""; 
         }
     } else {
+        btnPauseToggle.className = "btn-pause";
+        btnPauseToggle.style.backgroundColor = "#da3633";
+        btnPauseToggle.innerHTML = "✋ PAUSAR TUDO";
+        btnPauseToggle.disabled = false;
+
         chaosEditorArea.classList.add("hidden");
         chaosEditorArea.classList.remove("blocked");
         startChaosLoop(); 
     }
 }
 
-function atualizarBotaoPause() {
-    if (isPaused) {
-        if(btnFireBurst) btnFireBurst.disabled = true; // Trava disparo
-        if (pausedBy === myId) {
-            btnPauseToggle.innerHTML = "▶️ CONTINUAR (Você Pausou)";
-            btnPauseToggle.className = "btn-pause btn-play";
-            btnPauseToggle.style.backgroundColor = "#3fb950";
-            btnPauseToggle.disabled = false;
-        } else {
-            btnPauseToggle.innerHTML = "🔒 PARCEIRO EDITANDO...";
-            btnPauseToggle.className = "btn-pause";
-            btnPauseToggle.style.backgroundColor = "#57606a";
-            btnPauseToggle.disabled = true;
-        }
+function updateFireButtonState() {
+    if (!btnFireBurst) return;
+    if (!isPaused && !isBursting) {
+        btnFireBurst.disabled = false;
+        btnFireBurst.innerText = "DISPARAR";
+        btnFireBurst.style.opacity = "1";
     } else {
-        if(btnFireBurst) btnFireBurst.disabled = false; // Destrava disparo
-        btnPauseToggle.innerHTML = "✋ PAUSAR TUDO";
-        btnPauseToggle.className = "btn-pause";
-        btnPauseToggle.style.backgroundColor = "#da3633";
-        btnPauseToggle.disabled = false;
+        btnFireBurst.disabled = true;
+        btnFireBurst.style.opacity = "0.5";
+        if (isBursting) btnFireBurst.innerText = "AGUARDANDO CHEGADA...";
+        else if (isPaused) btnFireBurst.innerText = "PAUSADO";
     }
 }
 
@@ -324,92 +373,121 @@ function atualizarBotaoPause() {
 function renderEditor() {
     activePacketList.innerHTML = "";
     if(activePackets.length === 0) { activePacketList.innerHTML = '<div class="empty-msg">Sem pacotes no fio.</div>'; return; }
-
+    
     activePackets.forEach((pkt, index) => {
-        const card = document.createElement("div");
-        card.className = "packet-card";
-        card.innerHTML = `
-            <div class="packet-info">
-                <span>📦 SEQ ${pkt.seq}</span>
-                <span class="packet-progress">${Math.round(pkt.x)}%</span>
-            </div>
-            <div class="packet-actions">
-                <button class="btn-icon" onclick="swapPacket(${index}, -1)" title="Mover Trás">⬆️</button>
-                <button class="btn-icon" onclick="swapPacket(${index}, 1)" title="Mover Frente">⬇️</button>
+        const card = document.createElement("div"); 
+        const isMine = (pkt.ownerId === myId);
+        card.className = isMine ? "packet-card" : "packet-card is-peer";
+        
+        let actionButtons = "";
+        if (isMine) {
+            actionButtons = `
+                <button class="btn-icon" onclick="swapPacket(${index}, -1)" title="Trás">⬆️</button>
+                <button class="btn-icon" onclick="swapPacket(${index}, 1)" title="Frente">⬇️</button>
                 <button class="btn-icon btn-dup" onclick="duplicatePacket(${index})" title="Duplicar">📑</button>
                 <button class="btn-icon btn-kill" onclick="deletePacket(${index})" title="Excluir">❌</button>
-            </div>
-        `;
+                <button class="btn-icon btn-corrupt" onclick="corruptPacket(${index})" title="Corromper (Bits)">⚡</button>
+            `;
+        } else {
+            actionButtons = `<span style="font-size:0.8rem; color: #8b949e; font-style: italic;">🔒 (Parceiro)</span>`;
+        }
+        card.innerHTML = `
+            <div class="packet-info"><span>📦 SEQ ${pkt.seq}</span><span class="packet-progress">${Math.round(pkt.x)}%</span></div>
+            <div class="packet-actions">${actionButtons}</div>`;
         activePacketList.appendChild(card);
     });
 }
 
-function deletePacket(index) {
-    if (!activePackets[index]) return;
-    activePackets[index].kill(); activePackets.splice(index, 1);
-    notifyEdit("DELETE", index); renderEditor();
+function deletePacket(index) { 
+    if (!activePackets[index]) return; if (activePackets[index].ownerId !== myId) return; 
+    activePackets[index].kill(); activePackets.splice(index, 1); notifyEdit("DELETE", index); renderEditor(); 
 }
 function duplicatePacket(index) {
-    if (!activePackets[index]) return;
-    const original = activePackets[index];
-    const clone = new ChaosPacket(original.seq, original.type, original.isReverse);
-    clone.x = original.x - 5; if(clone.x < 0) clone.x=0; clone.updatePos();
-    activePackets.splice(index + 1, 0, clone);
-    notifyEdit("DUPLICATE", index); renderEditor();
+    if (!activePackets[index]) return; if (activePackets[index].ownerId !== myId) return; 
+    const org = activePackets[index];
+    const clone = new ChaosPacket(org.seq, org.type, org.isReverse, org.ownerId, org.isCorrupted); 
+    clone.x = org.x - 5; if(clone.x < 0) clone.x=0; clone.updatePos();
+    activePackets.splice(index + 1, 0, clone); notifyEdit("DUPLICATE", index); renderEditor();
 }
 function swapPacket(index, direction) {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= activePackets.length) return;
-    const p1 = activePackets[index]; const p2 = activePackets[targetIndex];
-    const tempX = p1.x; p1.x = p2.x; p2.x = tempX; p1.updatePos(); p2.updatePos();
-    activePackets[index] = p2; activePackets[targetIndex] = p1;
-    notifyEdit("SWAP", index, targetIndex); renderEditor();
+    const ti = index + direction; if (ti < 0 || ti >= activePackets.length) return;
+    if (activePackets[index].ownerId !== myId) return; 
+    const p1 = activePackets[index]; const p2 = activePackets[ti];
+    const tx = p1.x; p1.x = p2.x; p2.x = tx; p1.updatePos(); p2.updatePos();
+    activePackets[index] = p2; activePackets[ti] = p1; notifyEdit("SWAP", index, ti); renderEditor();
 }
 
-function notifyEdit(action, idx1, idx2 = null) {
-    if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_EDIT", action: action, idx1: idx1, idx2: idx2 }));
+// NOVA FUNÇÃO DE CORRUPÇÃO
+function corruptPacket(index) {
+    if (!activePackets[index]) return;
+    if (activePackets[index].ownerId !== myId) return;
+
+    activePackets[index].toggleCorruption();
+    notifyEdit("CORRUPT", index); // Notifica o parceiro
+    // Não precisa renderEditor completo, mas vamos chamar para garantir consistência
+    // (ou poderíamos apenas mudar o estilo do botão, mas o render é mais seguro)
 }
+
+function notifyEdit(a, i1, i2 = null) { if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_EDIT", action: a, idx1: i1, idx2: i2 })); }
 function aplicarEdicaoRemota(msg) {
     if (msg.action === "DELETE") { if(activePackets[msg.idx1]) { activePackets[msg.idx1].kill(); activePackets.splice(msg.idx1, 1); } }
     else if (msg.action === "DUPLICATE") { 
-        if(activePackets[msg.idx1]) {
-            const org = activePackets[msg.idx1]; const cln = new ChaosPacket(org.seq, org.type, org.isReverse);
-            cln.x = org.x-5; if(cln.x<0) cln.x=0; cln.updatePos();
-            activePackets.splice(msg.idx1+1,0,cln);
-        }
+        if(activePackets[msg.idx1]) { const o = activePackets[msg.idx1]; const c = new ChaosPacket(o.seq, o.type, o.isReverse, o.ownerId, o.isCorrupted); c.x=o.x-5; if(c.x<0)c.x=0; c.updatePos(); activePackets.splice(msg.idx1+1,0,c); }
     }
     else if (msg.action === "SWAP") {
         const p1 = activePackets[msg.idx1]; const p2 = activePackets[msg.idx2];
-        if(p1 && p2) {
-            const tx = p1.x; p1.x=p2.x; p2.x=tx; p1.updatePos(); p2.updatePos();
-            activePackets[msg.idx1] = p2; activePackets[msg.idx2] = p1;
+        if(p1 && p2) { const tx = p1.x; p1.x=p2.x; p2.x=tx; p1.updatePos(); p2.updatePos(); activePackets[msg.idx1] = p2; activePackets[msg.idx2] = p1; }
+    }
+    else if (msg.action === "CORRUPT") {
+        // Aplica corrupção no pacote do parceiro
+        if (activePackets[msg.idx1]) {
+            activePackets[msg.idx1].toggleCorruption();
         }
     }
 }
 
-// --- LOOP & DISPARO (Correção Timeouts) ---
+// --- LOOP & DISPARO ---
 function startChaosLoop() {
     if (chaosLoopId) return;
     function loop() {
         if (!isPaused) {
             const now = Date.now();
-
-            // 1. Processa Nascimento (Spawn Queue) - SUBSTITUI OS TIMEOUTS
-            if (spawnQueue.length > 0) {
-                // Se já passou o tempo necessário desde o último spawn
-                if (now - lastSpawnTime > SPAWN_INTERVAL) {
-                    const nextPkt = spawnQueue.shift();
-                    const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse);
+            
+            // 1. Saída (Meus)
+            if (outgoingQueue.length > 0) {
+                if (now - lastOutTime > SPAWN_INTERVAL) {
+                    const nextPkt = outgoingQueue.shift();
+                    const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
                     activePackets.push(pkt);
-                    lastSpawnTime = now;
+                    lastOutTime = now;
                 }
             }
 
-            // 2. Processa Movimento
+            // 2. Entrada (Parceiro)
+            if (incomingQueue.length > 0) {
+                if (now - lastInTime > SPAWN_INTERVAL) {
+                    const nextPkt = incomingQueue.shift();
+                    const pkt = new ChaosPacket(nextPkt.seq, nextPkt.type, nextPkt.isReverse, nextPkt.ownerId, nextPkt.isCorrupted);
+                    activePackets.push(pkt);
+                    lastInTime = now;
+                }
+            }
+
+            // 3. Move
             for (let i = activePackets.length - 1; i >= 0; i--) {
                 const pkt = activePackets[i];
                 const vivo = pkt.move();
                 if (!vivo) { pkt.kill(); activePackets.splice(i, 1); }
+            }
+
+            // 4. Auto-Unlock
+            if (isBursting) {
+                const myActive = activePackets.filter(p => p.ownerId === myId).length;
+                const myPending = outgoingQueue.length;
+                if (myActive === 0 && myPending === 0) {
+                    isBursting = false;
+                    updateFireButtonState();
+                }
             }
         }
         chaosLoopId = requestAnimationFrame(loop);
@@ -418,23 +496,48 @@ function startChaosLoop() {
 }
 
 function dispararRajada() {
-    if(isPaused) return; 
-    if(ws && ws.readyState===1) ws.send(JSON.stringify({ type: "CHAOS_BURST", qtd: burstSize, original_sender_id: myId }));
-    executarDisparoVisual(burstSize, false);
+    if(isPaused || isBursting) return; 
+    
+    isBursting = true;
+    updateFireButtonState();
+    
+    const startSeq = myNextChaosSeq;
+
+    atualizarInspetor({
+        tcp_seq: startSeq,
+        tcp_ack: 0,
+        tcp_sport: myRealPort,
+        tcp_dport: 80,
+        type: "DATA",
+        payload: "[RAJADA]"
+    });
+
+    if(ws && ws.readyState===1) {
+        ws.send(JSON.stringify({ 
+            type: "CHAOS_BURST", 
+            qtd: burstSize, 
+            original_sender_id: myId,
+            startSeq: startSeq 
+        }));
+    }
+    
+    myNextChaosSeq += (100 * burstSize);
+    executarDisparoVisual(burstSize, false, myId, startSeq);
 }
 
-function executarDisparoVisual(qtd, isReverse = false) {
-    btnPauseToggle.disabled = false;
-    
-    // Apenas enfileira os pedidos. O loop cuida de criar no tempo certo.
+function executarDisparoVisual(qtd, isReverse = false, ownerId, startSeq) {
+    let currentSeqForLoop = startSeq;
+
     for (let i = 0; i < qtd; i++) {
-        spawnQueue.push({
-            seq: nextSeqNum,
-            type: "DATA",
-            isReverse: isReverse
-        });
-        nextSeqNum += 100; 
+        // IMPORTANTE: isCorrupted começa false por padrão
+        const payload = { seq: currentSeqForLoop, type: "DATA", isReverse: isReverse, ownerId: ownerId, isCorrupted: false };
+        
+        if (isReverse) incomingQueue.push(payload); 
+        else outgoingQueue.push(payload);
+        
+        currentSeqForLoop += 100; 
     }
+    
     startChaosLoop();
 }
 
