@@ -196,29 +196,80 @@ function processarRecebimento(pacote) {
     let seq = Number(pacote.tcp_seq); 
     atualizarInspetor(pacote);
     logSistema(`RX [${pacote.type}] SEQ=${seq}`);
+    
+    // Cálculo do ACK (
     let len = (pacote.payload) ? pacote.payload.length : 0;
     if (pacote.type === "SYN" || pacote.type === "FIN" || pacote.type === "SYN-ACK") len = 1;
     if (!isNaN(pacote.tcp_seq)) currentAck = pacote.tcp_seq + len;
+
+    // HANDSHAKE PADRÃO
+    if(tcpState==="CLOSED" && pacote.type==="SYN") { 
+        mudarEstado("SYN_RCVD"); 
+        setTimeout(()=>enviarPacote("SYN-ACK"),1000); 
+    }
     
-    if(tcpState==="CLOSED" && pacote.type==="SYN") { mudarEstado("SYN_RCVD"); setTimeout(()=>enviarPacote("SYN-ACK"),1000); }
-    else if(tcpState==="SYN_SENT" && pacote.type==="SYN-ACK") { currentSeq++; mudarEstado("ESTABLISHED"); setTimeout(()=>enviarPacote("ACK"),1000); }
-    else if(tcpState==="SYN_RCVD" && pacote.type==="ACK") { mudarEstado("ESTABLISHED"); }
+    // SIMULTANEOUS OPEN
+    else if(tcpState==="SYN_SENT") {
+        if (pacote.type==="SYN-ACK") { 
+            currentSeq++; 
+            mudarEstado("ESTABLISHED"); 
+            setTimeout(()=>enviarPacote("ACK"),1000); 
+        } 
+        else if (pacote.type === "SYN") { 
+            logSistema("Simultaneous Open detectado!");
+            mudarEstado("SYN_RCVD");
+            setTimeout(()=>enviarPacote("SYN-ACK"), 1000);
+        }
+    }
+
+    // CONCLUSÃO SIMULTÂNEA
+    else if(tcpState==="SYN_RCVD") {
+        if (pacote.type==="ACK" || pacote.type==="SYN-ACK") { 
+            mudarEstado("ESTABLISHED"); 
+        }
+    }
+
+    // CONEXÃO ESTABELECIDA
     else if(tcpState==="ESTABLISHED") {
         if(pacote.type==="DATA") adicionarNoChat(pacote.payload, "received");
         if(pacote.type==="FIN") { 
             mudarEstado("CLOSE_WAIT"); 
-            setTimeout(()=>{ enviarPacote("ACK"); setTimeout(()=>{ mudarEstado("LAST_ACK"); enviarPacote("FIN"); },1500); },500); 
+            setTimeout(()=>{ 
+                enviarPacote("ACK"); 
+                setTimeout(()=>{ 
+                    mudarEstado("LAST_ACK"); 
+                    enviarPacote("FIN"); 
+                },1500); 
+            },500); 
         }
     }
+
+    // ENCERRAMENTO ATIVO E SIMULTANEOUS CLOSE
     else if(tcpState==="FIN_WAIT_1") {
-        if (pacote.type === "ACK") { mudarEstado("FIN_WAIT_2"); } 
-        else if (pacote.type === "FIN") { enviarPacote("ACK"); mudarEstado("CLOSING"); }
+        if (pacote.type === "ACK") { 
+            mudarEstado("FIN_WAIT_2"); 
+        } 
+        else if (pacote.type === "FIN") { 
+            logSistema("Simultaneous Close detectado!");
+            enviarPacote("ACK"); 
+            mudarEstado("CLOSING"); 
+        }
     }
+
+    // ESTADOS FINAIS DE ENCERRAMENTO
     else if(tcpState==="FIN_WAIT_2" && pacote.type==="FIN") {
-        enviarPacote("ACK"); mudarEstado("TIME_WAIT");
+        enviarPacote("ACK"); 
+        mudarEstado("TIME_WAIT");
         setTimeout(() => resetarLocalmente(), 2000); 
     }
-    else if(tcpState==="LAST_ACK" && pacote.type==="ACK") { resetarLocalmente(); }
+    else if(tcpState==="LAST_ACK" && pacote.type==="ACK") { 
+        resetarLocalmente(); 
+    }
+    
+    else if (tcpState === "CLOSING" && pacote.type === "ACK") {
+        mudarEstado("TIME_WAIT");
+        setTimeout(() => resetarLocalmente(), 2000);
+    }
 }
 
 // Envia pacote padrão e cria animação visual
