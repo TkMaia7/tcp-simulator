@@ -259,7 +259,7 @@ function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, 
 function resetarLocalmente() { mudarEstado("CLOSED"); currentSeq=100; currentAck=0; atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); logSistema("Conexão resetada."); }
 
 // Helpers Visuais (Chat, Logs, Inspetor, Animação)
-function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0; }
+function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0; inspPayload.innerText = p.payload || "[Vazio]";}
 function logSistema(m) { miniLog.innerText=`> ${m}`; }
 function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
 function animarRecebimento(p) { criarElementoPacote(p.type, "left"); setTimeout(()=>processarRecebimento(p), 1500); }

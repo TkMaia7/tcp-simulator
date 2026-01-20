@@ -80,6 +80,32 @@ button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; bord
 .btn-lobby { border: 1px solid #f85149; color: #f85149; }
 .btn-lobby:hover { background: rgba(218, 54, 51, 0.1); }
 
+/* PERSONALIZAÇÃO DE SCROLLBAR */
+
+* {
+    scrollbar-width: thin;          
+    scrollbar-color: #30363d #0d1117; 
+}
+
+*::-webkit-scrollbar {
+    width: 8px;               
+    height: 8px;              
+}
+
+*::-webkit-scrollbar-track {
+    background: #0d1117;      /
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: #30363d; 
+    border-radius: 4px;       
+    border: 2px solid #0d1117; 
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: #58a6ff; /* Cor ao passar o mouse (azul destaque do GitHub) */
+}
+
 /* ADAPTAÇÃO MOBILE */
 
 /* Ajustes globais para telas pequenas (Tablets e Celulares) */
@@ -100,3 +126,4 @@ button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; bord
     h1 { font-size: 1.4rem; }
     .subtitle { font-size: 0.8rem; }
 }
+
