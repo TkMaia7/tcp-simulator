@@ -1,30 +1,20 @@
 /* =========================================
-   CHAOS.CSS (Original Restaurado + Fixes)
+   CHAOS.CSS (V42 - Visual Restaurado & Buffer Dinâmico)
    ========================================= */
 
 /* --- BOTÃO DE ENTRADA --- */
 .btn-chaos-entry {
-    background: #d29922;
-    border: 1px solid #ac7b18;
-    color: #0d1117;
-    font-weight: 800;
-    height: 90px; 
-    width: 100%;
-    margin-top: 0;
+    background: #d29922; border: 1px solid #ac7b18; color: #0d1117;
+    font-weight: 800; height: 90px; width: 100%; margin-top: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px;
-    border-radius: 8px;
-    transition: background-color 0.2s;
-    cursor: pointer;
+    border-radius: 8px; transition: background-color 0.2s; cursor: pointer;
     box-shadow: 0 4px 6px rgba(0,0,0,0.2);
 }
 .btn-chaos-entry:hover { background: #e3b341; border-color: #d29922; }
-.btn-chaos-entry:disabled {
-    background: #21262d; border-color: #30363d; color: #484f58;
-    cursor: not-allowed; box-shadow: none; filter: grayscale(1);
-}
+.btn-chaos-entry:disabled { background: #21262d; border-color: #30363d; color: #484f58; cursor: not-allowed; filter: grayscale(1); }
 
-/* --- TELA PRINCIPAL (OVERLAY) --- */
+/* --- TELA PRINCIPAL --- */
 #chaos-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: #0d1117; z-index: 2000;
@@ -38,188 +28,123 @@
 .chaos-header h2 { color: #d29922; margin: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; }
 .btn-close-chaos { background: #21262d; border: 1px solid #30363d; width: auto; padding: 8px 20px; color: #c9d1d9; cursor: pointer; }
 
-/* --- PALCO VISUAL (STAGE) --- */
+/* --- PALCO VISUAL --- */
 .chaos-stage {
     background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-    padding: 40px; display: flex; align-items: center; justify-content: space-between;
-    min-height: 150px; position: relative;
-    transition: all 0.3s;
+    padding: 60px 40px; /* Aumentei padding top para caber o buffer */
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 150px; position: relative; transition: all 0.3s;
 }
-
 .chaos-wire-container { 
     flex-grow: 1; margin: 0 30px; position: relative; 
-    height: 4px; background: #30363d; 
-    display: flex; align-items: center; 
+    height: 4px; background: #30363d; display: flex; align-items: center; 
 }
 
-/* --- MODIFICAÇÃO NECESSÁRIA NO ÍCONE --- */
-/* Encontre sua classe .node-icon atual e garanta que ela tenha position: relative */
+/* ÍCONE DO NÓ */
 .node-icon { 
-    /* Mantenha suas cores e fontes atuais */
     font-size: 1.2rem; font-weight: bold; color: #8b949e; 
     background: #21262d; padding: 10px 20px; 
     border-radius: 6px; border: 1px solid #30363d; z-index: 5;
-    
-    /* ADICIONE ISSO: */
-    position: relative; 
+    position: relative; /* CRITICO PARA O BUFFER */
 }
 
-/* --- NOVO: ZONA DE BUFFER (Cole no final do arquivo) --- */
+/* --- ZONA DE BUFFER (Geral) --- */
 .chaos-buffer-zone {
     position: absolute;
-    top: -55px;        /* Fica acima do ícone */
-    right: 0;          /* Alinhado à direita do ícone */
-    min-width: 80px;
+    top: -55px;
+    
+    /* Tamanho flexível para crescer conforme entram pacotes */
+    min-width: 80px; 
     height: 45px;
-    border: 2px dashed #a371f7; /* Roxo */
-    border-radius: 6px;
+    padding: 0 15px; /* Espaço nas pontas */
+    
+    border: 2px dashed #a371f7; 
+    border-radius: 8px; /* Bordas mais arredondadas */
     background: rgba(163, 113, 247, 0.15);
-    display: flex;
-    align-items: center;
+    
+    display: flex; 
+    align-items: center; 
     justify-content: center;
-    gap: 5px;
-    padding: 0 10px;
+    gap: 8px; /* [FIX] Espaçamento real entre os pacotes */
+    
     z-index: 10;
-    transition: all 0.3s ease;
-    opacity: 0; /* Começa invisível, o JS vai mostrar */
+    transition: all 0.3s ease; 
+    opacity: 0; 
     transform: translateY(10px);
+    pointer-events: none;
 }
+.chaos-buffer-zone.visible { opacity: 1; transform: translateY(0); }
 
-.chaos-buffer-zone.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
+/* Etiquetas de Texto */
 .chaos-buffer-zone::before {
-    content: "BUFFER";
-    position: absolute; top: -18px; right: 0; 
-    font-size: 0.65rem; font-weight: bold; 
-    color: #a371f7; opacity: 0.9;
+    position: absolute; top: -20px; 
+    font-size: 0.7rem; font-weight: 800; 
+    width: 100%; text-align: center;
+    text-transform: uppercase; letter-spacing: 1px;
 }
+.chaos-buffer-zone.left::before { content: "MEU BUFFER"; color: #3fb950; }
+.chaos-buffer-zone.right::before { content: "BUFFER DELE"; color: #a371f7; }
 
-/* Estilo para pacotes dentro do buffer */
+/* Cores das Bordas */
+.chaos-buffer-zone.left { left: 0; border-color: #3fb950; background: rgba(63, 185, 80, 0.1); }
+.chaos-buffer-zone.right { right: 0; border-color: #a371f7; }
+
+/* --- PACOTES DENTRO DO BUFFER --- */
 .packet.buffered {
     position: relative !important; 
     top: 0 !important; left: 0 !important;
-    transform: scale(0.85); 
-    box-shadow: none !important;
-    margin-left: -15px; /* Empilha um sobre o outro */
-    border: 1px solid rgba(255,255,255,0.5);
-    animation: pulseBuffer 2s infinite;
-}
-.packet.buffered:first-child { margin-left: 0; }
-
-@keyframes pulseBuffer { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
-
-/* --- CONTROLES E BOTÕES --- */
-.chaos-controls {
-    display: flex; gap: 20px; align-items: center; justify-content: center;
-    background: #21262d; padding: 20px; border-radius: 8px; border: 1px solid #30363d;
-}
-.control-group { display: flex; align-items: center; gap: 10px; }
-.control-group label { color: #8b949e; font-weight: bold; }
-.burst-selector {
-    display: flex; gap: 5px; background: #0d1117;
-    padding: 4px; border-radius: 6px; border: 1px solid #30363d;
-}
-.btn-opt {
-    background: transparent; border: none; color: #8b949e;
-    padding: 6px 12px; border-radius: 4px; cursor: pointer;
-    font-weight: bold; transition: all 0.2s; min-width: 40px;
-}
-.btn-opt:hover { background: rgba(255,255,255,0.1); color: #c9d1d9; }
-.btn-opt.selected { background: #1f6feb; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-.btn-fire { background: #d29922; color: #0d1117; font-weight: bold; width: auto; min-width: 180px; padding: 8px; border-radius: 4px; border: none; }
-.btn-fire:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-pause { background: #da3633; width: auto; min-width: 150px; color: white; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
-.btn-play { background: #3fb950; }
-.divider-v { width: 1px; height: 40px; background: #30363d; margin: 0 10px; }
-
-/* --- ÁREA DE EDIÇÃO --- */
-.chaos-editor { 
-    flex-grow: 1; background: #161b22; 
-    border: 2px dashed #30363d; border-radius: 8px; 
-    padding: 10px; 
-    /* [FIX 1] SCROLL: Adicionado max-height para habilitar rolagem */
-    max-height: 350px; 
-    overflow-y: auto; 
     
-    transition: opacity 0.3s; 
-    position: relative;
+    /* Visual "Glass" Branco e Legível */
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid #fff !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Sombra no texto para leitura */
+    
+    /* Tamanho e Fonte */
+    min-width: 42px; /* Mais largo para caber '1200' */
+    height: 26px;
+    font-size: 0.75rem !important;
+    line-height: 26px;
+    border-radius: 4px;
+    
+    /* Reset de Física */
+    transform: none !important; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+    margin: 0 !important; /* Sem margem negativa */
+    
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.chaos-editor.blocked::after {
-    content: "🔒 PAUSADO PELO PARCEIRO (Somente ele pode editar)";
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(13, 17, 23, 0.85);
-    color: #ff7b72; font-weight: bold;
+@keyframes popIn {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+/* --- PACOTES --- */
+#chaos-packet-layer .packet {
+    position: absolute; top: -14px; 
+    width: 36px; height: 28px;
+    background: #58a6ff; color: #000;
+    font-size: 0.7rem; font-weight: bold; font-family: monospace;
     display: flex; align-items: center; justify-content: center;
-    z-index: 10; text-align: center;
+    border-radius: 4px; border: 1px solid #fff;
+    box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+    user-select: none; pointer-events: none; z-index: 10;
+    transition: none !important; 
 }
-
-.chaos-editor.hidden { opacity: 0.2; pointer-events: none; }
-
-#active-packet-list { display: flex; flex-direction: column; gap: 8px; }
-
-/* CARTÃO DO PACOTE */
-.packet-card {
-    background: #21262d; border: 1px solid #30363d; padding: 10px;
-    border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
-    animation: fadeIn 0.2s;
-}
-.packet-card:hover { border-color: #58a6ff; }
-
-.packet-info { 
-    font-family: monospace; color: #58a6ff; font-weight: bold; font-size: 1rem; 
-    display: flex; gap: 10px; align-items: center;
-}
-.packet-progress { font-size: 0.75rem; color: #8b949e; }
-
-.packet-actions { display: flex; gap: 5px; }
-
-/* Botões Pequenos do Cartão */
-.btn-icon {
-    background: #30363d; border: none; color: #c9d1d9;
-    width: 30px; height: 30px; border-radius: 4px;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; font-size: 1rem;
-}
-.btn-icon:hover { background: #58a6ff; color: #000; }
-.btn-kill:hover { background: #da3633; color: #fff; }
-
-.empty-msg { text-align: center; color: #484f58; padding: 20px; font-style: italic; }
-
-/* Classes Visuais */
-.packet.peer {
+#chaos-packet-layer .packet.peer {
     background: #a371f7 !important; border-color: #8957e5 !important;
     color: #fff; box-shadow: 0 0 10px rgba(163, 113, 247, 0.4);
 }
-.packet.corrupted {
-    background: #da3633 !important; border: 2px dashed #f85149 !important;
-    color: #fff; text-decoration: line-through; animation: shake 0.5s infinite;
-}
-.packet.ACK {
+#chaos-packet-layer .packet.ACK {
     background: #e3b341 !important; border-color: #ac7b18 !important;
     color: #000; border-radius: 50%; width: 28px; height: 28px;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.7rem; z-index: 5;
 }
-
-/* Animações */
-@keyframes flashSuccess {
-    0% { box-shadow: 0 0 0 rgba(63, 185, 80, 0); border-color: #30363d; transform: scale(1); }
-    50% { box-shadow: 0 0 20px rgba(63, 185, 80, 0.8); border-color: #3fb950; transform: scale(1.1); background: #1c2e21; }
-    100% { box-shadow: 0 0 0 rgba(63, 185, 80, 0); border-color: #30363d; transform: scale(1); }
-}
-@keyframes flashReceive {
-    0% { box-shadow: 0 0 0 rgba(88, 166, 255, 0); border-color: #30363d; transform: scale(1); }
-    50% { box-shadow: 0 0 20px rgba(88, 166, 255, 0.8); border-color: #58a6ff; transform: scale(1.1); background: #162a42; }
-    100% { box-shadow: 0 0 0 rgba(88, 166, 255, 0); border-color: #30363d; transform: scale(1); }
-}
-@keyframes flashError {
-    0% { box-shadow: 0 0 0 rgba(218, 54, 51, 0); border-color: #30363d; transform: scale(1); }
-    50% { box-shadow: 0 0 20px rgba(218, 54, 51, 0.8); border-color: #da3633; transform: scale(1.1); background: #2a0f0f; }
-    100% { box-shadow: 0 0 0 rgba(218, 54, 51, 0); border-color: #30363d; transform: scale(1); }
+#chaos-packet-layer .packet.corrupted {
+    background: #da3633 !important; border: 2px dashed #f85149 !important;
+    text-decoration: line-through; animation: shake 0.5s infinite; color: #fff;
 }
 @keyframes shake {
     0% { transform: translateX(0); }
@@ -228,9 +153,56 @@
     100% { transform: translateX(0); }
 }
 
-.anim-success { animation: flashSuccess 0.5s ease-out; }
-.anim-receive { animation: flashReceive 0.5s ease-out; }
-.anim-error { animation: flashError 0.5s ease-out; }
+/* --- CONTROLES --- */
+.chaos-controls {
+    display: flex; gap: 20px; align-items: center; justify-content: center;
+    background: #21262d; padding: 20px; border-radius: 8px; border: 1px solid #30363d;
+}
+.control-group { display: flex; align-items: center; gap: 10px; }
+.control-group label { color: #8b949e; font-weight: bold; }
+.burst-selector { display: flex; gap: 5px; background: #0d1117; padding: 4px; border-radius: 6px; border: 1px solid #30363d; }
+.btn-opt {
+    background: transparent; border: none; color: #8b949e; padding: 6px 12px; border-radius: 4px; 
+    cursor: pointer; font-weight: bold; transition: all 0.2s; min-width: 40px;
+}
+.btn-opt:hover { background: rgba(255,255,255,0.1); color: #c9d1d9; }
+.btn-opt.selected { background: #1f6feb; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.btn-fire { background: #d29922; color: #0d1117; font-weight: bold; width: auto; min-width: 180px; padding: 8px; border-radius: 4px; border: none; }
+.btn-fire:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-pause { background: #da3633; width: auto; min-width: 150px; color: white; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
+.divider-v { width: 1px; height: 40px; background: #30363d; margin: 0 10px; }
+
+/* --- EDITOR (Restaurado para ficar bonito) --- */
+.chaos-editor { 
+    flex-grow: 1; background: #161b22; border: 2px dashed #30363d; border-radius: 8px; 
+    padding: 10px; max-height: 350px; overflow-y: auto; transition: opacity 0.3s; position: relative;
+}
+.chaos-editor.blocked::after {
+    content: "🔒 PAUSADO PELO PARCEIRO"; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(13, 17, 23, 0.85); color: #ff7b72; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.chaos-editor.hidden { opacity: 0.2; pointer-events: none; }
+#active-packet-list { display: flex; flex-direction: column; gap: 8px; }
+
+.packet-card {
+    background: #21262d; border: 1px solid #30363d; padding: 12px;
+    border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
+}
+.packet-card.is-peer { border-left: 3px solid #a371f7; opacity: 0.9; }
+.packet-info { font-family: monospace; color: #58a6ff; font-weight: bold; font-size: 1rem; }
+
+/* [FIXED] Botões lado a lado */
+.packet-actions { display: flex; gap: 6px; align-items: center; } 
+.packet-actions button {
+    background: #30363d; border: 1px solid #30363d; color: #c9d1d9; 
+    width: 32px; height: 32px; border-radius: 4px; cursor: pointer; 
+    display: flex; align-items: center; justify-content: center; font-size: 1rem;
+    transition: all 0.2s;
+}
+.packet-actions button:hover { background: #58a6ff; color: #000; border-color: #58a6ff; }
+.btn-corrupt { color: #da3633 !important; border-color: #da3633 !important; }
+.btn-corrupt:hover { background: #da3633 !important; color: white !important; }
 
 /* LOG */
 .chaos-log {
@@ -246,28 +218,9 @@
 .log-entry.error { border-color: #da3633; color: #ff7b72; background: rgba(218, 54, 51, 0.1); }
 .log-entry.ack { border-color: #e3b341; color: #e3b341; }
 .log-entry.warn { border-color: #d29922; color: #d29922; }
-.chaos-log::-webkit-scrollbar { width: 6px; }
-.chaos-log::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 
-/* --- MOBILE FIX --- */
 @media (max-width: 768px) {
     .chaos-stage { flex-direction: column; padding: 40px 20px; min-height: 250px; }
     .chaos-wire-container { width: 100%; height: 4px; transform: rotate(90deg); margin: 60px 0; }
     .chaos-controls { flex-direction: column; gap: 15px; }
-    .divider-v { width: 100%; height: 1px; margin: 5px 0; }
-}
-
-/* --- [FIX 2] FÍSICA: Obrigatório para o JS controlar o movimento --- */
-#chaos-packet-layer .packet {
-    position: absolute; top: -14px; 
-    width: 36px; height: 28px;
-    background: #58a6ff; color: #000;
-    font-size: 0.7rem; font-weight: bold; font-family: monospace;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 4px; border: 1px solid #fff;
-    box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
-    user-select: none; pointer-events: none; z-index: 10;
-    
-    /* Esta linha impede que o CSS 'lute' contra a animação do JS */
-    transition: none !important; 
 }
