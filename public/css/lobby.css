@@ -1,3 +1,6 @@
+/* ESTRUTURA GERAL DO LOBBY */
+
+/* Container principal da tela de seleção de salas */
 #lobby-screen {
     display: flex;
     justify-content: center;
@@ -5,6 +8,7 @@
     padding: 20px 0;
 }
 
+/* Wrapper que alinha o formulário e a lista lado a lado */
 .lobby-wrapper {
     display: flex;
     gap: 20px;
@@ -13,7 +17,9 @@
     align-items: stretch;
 }
 
-/* ESTILO UNIFICADO DAS CAIXAS */
+/* CAIXAS E CONTEÚDOS */
+
+/* Estilo unificado para os painéis de formulário e lista */
 .lobby-box, .room-list-box {
     background: #21262d; /* Garante que ambos tenham fundo cinza visível */
     padding: 25px;
@@ -25,12 +31,13 @@
     flex-direction: column;
 }
 
-/* Ajustes da Lista */
+/* Ajustes específicos para o painel da lista de salas */
 .room-list-box {
     height: auto; 
     min-height: 350px;
 }
 
+/* Título do painel de lista */
 .room-list-box h3 {
     margin-top: 0;
     color: #8b949e;
@@ -40,13 +47,16 @@
     margin-bottom: 15px;
 }
 
+/* LISTAGEM DE SALAS */
+
+/* Container rolável onde os itens de sala são inseridos */
 #lista-salas-container {
     overflow-y: auto;
     flex-grow: 1;
     max-height: 400px;
 }
 
-/* Item da Lista */
+/* Estilo individual de cada sala na lista */
 .room-item {
     background: #0d1117;
     border: 1px solid #30363d;
@@ -59,42 +69,56 @@
     justify-content: space-between;
     align-items: center;
 }
-
+/* Efeito de hover no item da sala */
 .room-item:hover {
     border-color: #58a6ff;
     background: #161b22;
 }
 
+/* Elementos de texto dentro do item da sala */
 .room-item-name { font-weight: bold; color: #58a6ff; }
 .room-item-action { font-size: 0.8rem; color: #8b949e; }
 .empty-msg { text-align: center; color: #484f58; margin-top: 40px; font-style: italic; }
 
-/* Formulário */
+/* FORMULÁRIO DE ENTRADA */
+
+/* Título do formulário */
 .lobby-box h2 { margin-top: 0; color: #58a6ff; text-align: center; margin-bottom: 20px; font-size: 1.5rem; }
+
+/* Grupo de campos de input (Nome, Senha) */
 .input-group { margin-bottom: 15px; width: 100%; }
 .input-group label { display: block; font-size: 0.85rem; margin-bottom: 6px; color: #8b949e; font-weight: bold; }
 .input-group input { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 1rem; transition: border-color 0.2s; }
 .input-group input:focus { border-color: #58a6ff; outline: none; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1); }
 
+/* CONTROLES E BOTÕES DO LOBBY */
+
+/* Container dos botões de ação */
 .lobby-actions { display: flex; gap: 10px; margin-top: 25px; }
 .lobby-actions button { flex: 1; }
+
+/* Estilos específicos dos botões */
 .btn-create { background-color: #1f6feb; border-color: rgba(255,255,255,0.1); }
 .btn-create:hover { background-color: #388bfd; }
 .btn-join { background-color: #238636; }
 .btn-exit { background-color: #da3633; border-color: #f85149; color: white; }
 .btn-exit:hover { background-color: #b62324; }
+
+/* Mensagem de status/erro do lobby */
 #lobby-msg { margin-top: 15px; text-align: center; font-size: 0.8rem; min-height: 20px; font-weight: bold; }
 
-/* --- MOBILE: EMPILHAMENTO E CORREÇÃO DE SOBREPOSIÇÃO --- */
+/* RESPONSIVIDADE */
+
+/* Ajustes de empilhamento para telas menores (Mobile) */
 @media (max-width: 768px) {
     #lobby-screen { 
         padding: 5px; 
-        margin-top: 20px; /* <--- MARGEM DE SEGURANÇA EXTRA */
+        margin-top: 20px; 
     }
     
     .lobby-wrapper {
         flex-direction: column;
-        gap: 20px; /* Mais espaço entre o form e a lista */
+        gap: 20px; 
     }
 
     .lobby-box, .room-list-box {
@@ -104,7 +128,7 @@
         box-sizing: border-box;
     }
 
-    /* Lista vai para baixo e com altura limitada */
+    /* Reordena para lista ficar abaixo do formulário */
     .room-list-box {
         order: 2;
         max-height: 300px;

@@ -1,8 +1,6 @@
-/* =========================================
-   CHAOS.CSS (V42 - Visual Restaurado & Buffer Dinâmico)
-   ========================================= */
+/* BOTÃO DE ENTRADA */
 
-/* --- BOTÃO DE ENTRADA --- */
+/* Botão que ativa o modo caos na interface principal */
 .btn-chaos-entry {
     background: #d29922; border: 1px solid #ac7b18; color: #0d1117;
     font-weight: 800; height: 90px; width: 100%; margin-top: 0;
@@ -11,16 +9,21 @@
     border-radius: 8px; transition: background-color 0.2s; cursor: pointer;
     box-shadow: 0 4px 6px rgba(0,0,0,0.2);
 }
+
+/* Estados interativos do botão de entrada */
 .btn-chaos-entry:hover { background: #e3b341; border-color: #d29922; }
 .btn-chaos-entry:disabled { background: #21262d; border-color: #30363d; color: #484f58; cursor: not-allowed; filter: grayscale(1); }
 
-/* --- TELA PRINCIPAL --- */
+/* LAYOUT PRINCIPAL */
+
+/* Container de tela cheia (Overlay) */
 #chaos-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: #0d1117; z-index: 2000;
     padding: 20px; box-sizing: border-box;
     display: flex; flex-direction: column; gap: 20px;
 }
+/* Cabeçalho com título e botão de fechar */
 .chaos-header {
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 2px solid #30363d; padding-bottom: 15px;
@@ -28,45 +31,44 @@
 .chaos-header h2 { color: #d29922; margin: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; }
 .btn-close-chaos { background: #21262d; border: 1px solid #30363d; width: auto; padding: 8px 20px; color: #c9d1d9; cursor: pointer; }
 
-/* --- PALCO VISUAL --- */
+/* PALCO E ELEMENTOS VISUAIS */
+
+/* Área de simulação onde os nós e fios ficam */
 .chaos-stage {
     background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-    padding: 60px 40px; /* Aumentei padding top para caber o buffer */
+    padding: 60px 40px; 
     display: flex; align-items: center; justify-content: space-between;
     min-height: 150px; position: relative; transition: all 0.3s;
 }
+/* O cabo/fio onde os pacotes trafegam */
 .chaos-wire-container { 
     flex-grow: 1; margin: 0 30px; position: relative; 
     height: 4px; background: #30363d; display: flex; align-items: center; 
 }
-
-/* ÍCONE DO NÓ */
+/* Representação dos computadores nas pontas */
 .node-icon { 
     font-size: 1.2rem; font-weight: bold; color: #8b949e; 
     background: #21262d; padding: 10px 20px; 
     border-radius: 6px; border: 1px solid #30363d; z-index: 5;
-    position: relative; /* CRITICO PARA O BUFFER */
+    position: relative; 
 }
 
-/* --- ZONA DE BUFFER (Geral) --- */
+/* SISTEMA DE BUFFER */
+
+/* Container flutuante para pacotes fora de ordem */
 .chaos-buffer-zone {
     position: absolute;
     top: -55px;
-    
-    /* Tamanho flexível para crescer conforme entram pacotes */
     min-width: 80px; 
     height: 45px;
-    padding: 0 15px; /* Espaço nas pontas */
-    
+    padding: 0 15px; 
     border: 2px dashed #a371f7; 
-    border-radius: 8px; /* Bordas mais arredondadas */
+    border-radius: 8px; 
     background: rgba(163, 113, 247, 0.15);
-    
     display: flex; 
     align-items: center; 
     justify-content: center;
-    gap: 8px; /* [FIX] Espaçamento real entre os pacotes */
-    
+    gap: 8px; 
     z-index: 10;
     transition: all 0.3s ease; 
     opacity: 0; 
@@ -75,7 +77,7 @@
 }
 .chaos-buffer-zone.visible { opacity: 1; transform: translateY(0); }
 
-/* Etiquetas de Texto */
+/* Etiquetas de identificação do buffer */
 .chaos-buffer-zone::before {
     position: absolute; top: -20px; 
     font-size: 0.7rem; font-weight: 800; 
@@ -85,42 +87,37 @@
 .chaos-buffer-zone.left::before { content: "MEU BUFFER"; color: #3fb950; }
 .chaos-buffer-zone.right::before { content: "BUFFER DELE"; color: #a371f7; }
 
-/* Cores das Bordas */
+/* Estilos específicos de posicionamento e cor */
 .chaos-buffer-zone.left { left: 0; border-color: #3fb950; background: rgba(63, 185, 80, 0.1); }
 .chaos-buffer-zone.right { right: 0; border-color: #a371f7; }
 
-/* --- PACOTES DENTRO DO BUFFER --- */
+/* Mini-pacotes dentro do buffer */
 .packet.buffered {
     position: relative !important; 
     top: 0 !important; left: 0 !important;
-    
-    /* Visual "Glass" Branco e Legível */
     background: rgba(255, 255, 255, 0.15) !important;
     border: 1px solid #fff !important;
     color: #fff !important;
     font-weight: 800 !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Sombra no texto para leitura */
-    
-    /* Tamanho e Fonte */
-    min-width: 42px; /* Mais largo para caber '1200' */
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5); 
+    min-width: 42px; 
     height: 26px;
     font-size: 0.75rem !important;
     line-height: 26px;
     border-radius: 4px;
-    
-    /* Reset de Física */
     transform: none !important; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
-    margin: 0 !important; /* Sem margem negativa */
-    
+    margin: 0 !important; 
     animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-
 @keyframes popIn {
     from { transform: scale(0); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
 }
-/* --- PACOTES --- */
+
+/* ESTILOS DE PACOTES */
+
+/* Pacote padrão viajando na rede */
 #chaos-packet-layer .packet {
     position: absolute; top: -14px; 
     width: 36px; height: 28px;
@@ -132,6 +129,7 @@
     user-select: none; pointer-events: none; z-index: 10;
     transition: none !important; 
 }
+/* Variações de tipo de pacote */
 #chaos-packet-layer .packet.peer {
     background: #a371f7 !important; border-color: #8957e5 !important;
     color: #fff; box-shadow: 0 0 10px rgba(163, 113, 247, 0.4);
@@ -153,13 +151,17 @@
     100% { transform: translateX(0); }
 }
 
-/* --- CONTROLES --- */
+/* CONTROLES E PAINEL INFERIOR */
+
+/* Barra de ferramentas */
 .chaos-controls {
     display: flex; gap: 20px; align-items: center; justify-content: center;
     background: #21262d; padding: 20px; border-radius: 8px; border: 1px solid #30363d;
 }
 .control-group { display: flex; align-items: center; gap: 10px; }
 .control-group label { color: #8b949e; font-weight: bold; }
+
+/* Seletor de rajada */
 .burst-selector { display: flex; gap: 5px; background: #0d1117; padding: 4px; border-radius: 6px; border: 1px solid #30363d; }
 .btn-opt {
     background: transparent; border: none; color: #8b949e; padding: 6px 12px; border-radius: 4px; 
@@ -167,12 +169,16 @@
 }
 .btn-opt:hover { background: rgba(255,255,255,0.1); color: #c9d1d9; }
 .btn-opt.selected { background: #1f6feb; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+/* Botões de ação principais */
 .btn-fire { background: #d29922; color: #0d1117; font-weight: bold; width: auto; min-width: 180px; padding: 8px; border-radius: 4px; border: none; }
 .btn-fire:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-pause { background: #da3633; width: auto; min-width: 150px; color: white; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
 .divider-v { width: 1px; height: 40px; background: #30363d; margin: 0 10px; }
 
-/* --- EDITOR (Restaurado para ficar bonito) --- */
+/* EDITOR DE PACOTES */
+
+/* Container da lista de edição */
 .chaos-editor { 
     flex-grow: 1; background: #161b22; border: 2px dashed #30363d; border-radius: 8px; 
     padding: 10px; max-height: 350px; overflow-y: auto; transition: opacity 0.3s; position: relative;
@@ -185,6 +191,7 @@
 .chaos-editor.hidden { opacity: 0.2; pointer-events: none; }
 #active-packet-list { display: flex; flex-direction: column; gap: 8px; }
 
+/* Cartões de pacote na lista */
 .packet-card {
     background: #21262d; border: 1px solid #30363d; padding: 12px;
     border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
@@ -192,7 +199,7 @@
 .packet-card.is-peer { border-left: 3px solid #a371f7; opacity: 0.9; }
 .packet-info { font-family: monospace; color: #58a6ff; font-weight: bold; font-size: 1rem; }
 
-/* [FIXED] Botões lado a lado */
+/* Botões de manipulação dentro do cartão */
 .packet-actions { display: flex; gap: 6px; align-items: center; } 
 .packet-actions button {
     background: #30363d; border: 1px solid #30363d; color: #c9d1d9; 
@@ -204,7 +211,9 @@
 .btn-corrupt { color: #da3633 !important; border-color: #da3633 !important; }
 .btn-corrupt:hover { background: #da3633 !important; color: white !important; }
 
-/* LOG */
+/* LOGS DO SISTEMA */
+
+/* Área de mensagens de log */
 .chaos-log {
     background: #010409; border: 1px solid #30363d; border-radius: 6px;
     height: 100px; overflow-y: auto; padding: 10px;
@@ -218,6 +227,8 @@
 .log-entry.error { border-color: #da3633; color: #ff7b72; background: rgba(218, 54, 51, 0.1); }
 .log-entry.ack { border-color: #e3b341; color: #e3b341; }
 .log-entry.warn { border-color: #d29922; color: #d29922; }
+
+/* RESPONSIVIDADE */
 
 @media (max-width: 768px) {
     .chaos-stage { flex-direction: column; padding: 40px 20px; min-height: 250px; }

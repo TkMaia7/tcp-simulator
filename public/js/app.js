@@ -1,9 +1,7 @@
-/* =================================================================================
-   TCP SIMULATOR - APP.JS (V42: Sincronia de Buffer & Visual Restaurado)
-   - Feature 1: Buffer dinâmico (Esquerda = Meu, Direita = Dele).
-   - Feature 2: Sincronia via WebSocket (O parceiro vê quando eu bufferizo).
-   ================================================================================= */
 
+// CONFIGURAÇÃO E ESTADO GLOBAL
+
+// Identidade e Estado da Conexão TCP Padrão
 let ws;
 const myId = "CLIENT_" + Math.floor(Math.random() * 10000);
 let tcpState = "CLOSED";
@@ -14,7 +12,32 @@ const myRealPort = Math.floor(Math.random() * (65535 - 49152 + 1)) + 49152;
 let currentSeq = Math.floor(Math.random() * 1000) + 100; 
 let currentAck = 0; 
 
-// --- Elementos DOM ---
+// Configurações do Laboratório de Caos
+const PACKET_SPEED = 0.4;      
+const TIMEOUT_DURATION = 10000;
+
+let simTime = 0;               
+let isChaosMode = false;
+let isPaused = false;
+let pausedBy = null; 
+
+let packets = [];             
+let spawnQueue = [];          
+let activePackets = packets;  
+let myNextSeq = 1000;
+let burstCount = 5;
+let isBursting = false;       
+
+let unackedData = {};         
+let receivedLog = new Set();  
+let chaosLoopId = null;
+
+let receiverBuffer = {}; 
+let nextExpectedSeq = 1000; 
+
+// ELEMENTOS DO DOM
+
+// Telas e Lobby
 const lobbyScreen = document.getElementById("lobby-screen");
 const workspaceScreen = document.getElementById("workspace-screen");
 const roomNameInput = document.getElementById("room-name");
@@ -23,7 +46,7 @@ const lobbyMsg = document.getElementById("lobby-msg");
 const listaSalasContainer = document.getElementById("lista-salas-container");
 const workspaceDiv = document.querySelector(".main-container"); 
 
-// --- Elementos Simulador ---
+// Simulador Padrão (Visual)
 const packetLayer = document.getElementById("packet-layer");
 const miniLog = document.getElementById("mini-log");
 const msgInput = document.getElementById("msg-input");
@@ -37,7 +60,7 @@ const wireLine = document.getElementById("wire-line");
 const displayMyPort = document.getElementById("display-my-port");
 const msgAguardando = document.getElementById("msg-aguardando");
 
-// --- Elementos Inspetor ---
+// Painel Inspetor
 const inspSport = document.getElementById("insp-sport");
 const inspDport = document.getElementById("insp-dport");
 const inspSeq = document.getElementById("insp-seq");
@@ -47,7 +70,7 @@ const inspFlags = document.getElementById("insp-flags");
 const inspPayload = document.getElementById("insp-payload");
 const btnOpenChaos = document.getElementById("btn-open-chaos"); 
 
-// --- Chaos Lab ---
+// Laboratório de Caos (Interface)
 const chaosScreen = document.getElementById("chaos-screen");
 const btnPauseToggle = document.getElementById("btn-pause-toggle");
 const btnFireBurst = document.getElementById("btn-fire-burst");
@@ -57,12 +80,12 @@ const chaosEditorArea = document.getElementById("chaos-editor-area");
 const chaosLogContainer = document.getElementById("chaos-log-container");
 const chaosNodes = document.querySelectorAll(".chaos-stage .node-icon"); 
 
-// Estado Inicial
+// Inicialização de Estado UI
 if(btnOpenChaos) btnOpenChaos.disabled = true; 
 
-// =========================================
-// 1. CONEXÃO
-// =========================================
+// WEBSOCKET 
+
+// Inicia a conexão WS e define o roteamento de todas as mensagens recebidas
 function conectarWS() {
     if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
     const host = window.location.hostname;
@@ -78,6 +101,7 @@ function conectarWS() {
             if (msg.original_sender_id === myId) return;
 
             switch (msg.type) {
+                // Mensagens de Lobby
                 case "ROOM_LIST": renderizarListaSalas(msg.rooms); break;
                 case "ROOM_ACCEPTED":
                     entrarNoSimulador(msg.room_id);
@@ -91,18 +115,20 @@ function conectarWS() {
                     }
                     break;
                 case "ERROR": mostrarErroLobby(msg.message); break;
+                
+                // Mensagens de Conexão P2P
                 case "PEER_JOINED": logSistema("Parceiro entrou!"); notificarConexaoEstabelecida(); break;
                 case "PEER_LEFT": 
                     if(isChaosMode) toggleChaosMode(false, false);
                     mostrarModalDesconexao(); 
                     break;
 
+                // Mensagens do Laboratório de Caos
                 case "CHAOS_SYNC": 
                     const action = msg.payload ? msg.payload.action : msg.action;
                     if(action === "OPEN") openChaosLab(false);
                     else closeChaosLab(false);
                     break;
-                
                 case "CHAOS_SPAWN": 
                     const pktData = msg.payload;
                     createVisualPacket({ 
@@ -115,20 +141,17 @@ function conectarWS() {
                         isCorrupted: pktData.isCorrupted 
                     });
                     break;
-                
                 case "CHAOS_PAUSE": aplicarPausa(msg.is_paused, msg.paused_by); break;
-                
                 case "CHAOS_EDIT": 
                 case "EDIT":
                     const editData = msg.payload ? msg.payload : { action: msg.action, id: msg.id, idx1: msg.idx1, idx2: msg.idx2 };
                     aplicarEdicaoRemota(editData); 
                     break;
-                
-                // [NOVO] Sincronia de Buffer
                 case "CHAOS_BUFFER_SYNC":
                     renderBufferRemote(msg.payload.seqs);
                     break;
 
+                // Mensagens Padrão (Simulador TCP Normal)
                 default: if (msg.original_sender_id !== myId && !isChaosMode) animarRecebimento(msg);
             }
         } catch (e) { console.error(e); }
@@ -136,9 +159,15 @@ function conectarWS() {
     ws.onerror = () => mostrarErroLobby("Erro de Conexão com o servidor.");
 }
 
-// =========================================
-// 2. LOBBY & TCP
-// =========================================
+// Envia mensagens de controle do modo Caos para o servidor
+function notifyRemote(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, original_sender_id: myId, payload: payload })); }
+
+// Helper para validar estado do socket antes de enviar
+function validarWS() { if(!ws || ws.readyState!==1) { mostrarErroLobby("Sem conexão."); return false;} return true; }
+
+// SISTEMA DE LOBBY
+
+// Atualiza a lista visual de salas no HTML
 function renderizarListaSalas(salas) {
     listaSalasContainer.innerHTML = "";
     if (salas.length === 0) { listaSalasContainer.innerHTML = '<div class="empty-msg">Nenhuma sala criada.</div>'; return; }
@@ -149,12 +178,20 @@ function renderizarListaSalas(salas) {
         listaSalasContainer.appendChild(div);
     });
 }
+
+// Ações dos botões do Lobby
 function criarSala() { if(validarWS()) ws.send(JSON.stringify({type: "CREATE_ROOM", room_id: roomNameInput.value, password: roomPassInput.value})); }
 function entrarSala() { if(validarWS()) ws.send(JSON.stringify({type: "JOIN_ROOM", room_id: roomNameInput.value, password: roomPassInput.value})); }
-function validarWS() { if(!ws || ws.readyState!==1) { mostrarErroLobby("Sem conexão."); return false;} return true; }
+
+// Feedback visual do Lobby
 function mostrarErroLobby(m) { lobbyMsg.innerText=m; lobbyMsg.style.color="#ff7b72"; }
+
+// Transição de tela Lobby / Simulador
 function entrarNoSimulador(id) { currentRoom = id; lobbyScreen.style.display="none"; workspaceScreen.style.display="block"; document.getElementById("display-room-name").innerText = id; }
 
+// SIMULADOR TCP PADRÃO 
+
+// Máquina de estados que processa pacotes recebidos no modo normal
 function processarRecebimento(pacote) {
     let seq = Number(pacote.tcp_seq); 
     atualizarInspetor(pacote);
@@ -184,6 +221,7 @@ function processarRecebimento(pacote) {
     else if(tcpState==="LAST_ACK" && pacote.type==="ACK") { resetarLocalmente(); }
 }
 
+// Envia pacote padrão e cria animação visual
 function enviarPacote(tipo, payload = "") {
     let seq = currentSeq; let ack = currentAck;
     if (tipo === "SYN" || tipo === "FIN") ack = 0;
@@ -194,6 +232,7 @@ function enviarPacote(tipo, payload = "") {
     if(ws && ws.readyState===1) ws.send(JSON.stringify(pacote));
 }
 
+// Gerencia a transição de estados TCP e habilita/desabilita UI
 function mudarEstado(novo) {
     tcpState = novo; statusBadge.innerText = novo; statusBadge.className = `status-badge ${novo}`;
     if (novo === "ESTABLISHED") {
@@ -213,11 +252,13 @@ function mudarEstado(novo) {
     }
 }
 
+// Botões de Ação do Usuário
 function iniciarHandshake() { if (tcpState === "CLOSED") { mudarEstado("SYN_SENT"); enviarPacote("SYN"); } }
 function iniciarFin() { if (tcpState === "ESTABLISHED") { mudarEstado("FIN_WAIT_1"); enviarPacote("FIN"); } }
 function enviarMensagem() { if(msgInput.value){ adicionarNoChat(msgInput.value, "sent"); enviarPacote("DATA", msgInput.value); msgInput.value=""; msgInput.focus(); } }
 function resetarLocalmente() { mudarEstado("CLOSED"); currentSeq=100; currentAck=0; atualizarInspetor({type:"-",tcp_seq:0,tcp_ack:0,payload:""}); logSistema("Conexão resetada."); }
 
+// Helpers Visuais (Chat, Logs, Inspetor, Animação)
 function atualizarInspetor(p) { inspSeq.innerText=p.tcp_seq||0; inspAck.innerText=p.tcp_ack||0; inspLen.innerText=p.payload?p.payload.length:0; inspFlags.innerText=(p.type==="DATA")?"PSH":p.type; inspSport.innerText = p.tcp_sport || 0; inspDport.innerText = p.tcp_dport || 0; }
 function logSistema(m) { miniLog.innerText=`> ${m}`; }
 function adicionarNoChat(m,t) { chatWindow.innerHTML+=`<div class="chat-msg msg-${t}">${m}</div>`; chatWindow.scrollTop=chatWindow.scrollHeight; }
@@ -229,307 +270,12 @@ function mostrarModalDesconexao() { document.getElementById("modal-overlay").sty
 function voltarLobby() { location.reload(); }
 function reiniciarSala() { document.getElementById("modal-overlay").style.display="none"; resetarLocalmente(); atualizarStatusTopo("Aguardando...", "#e3b341"); }
 
-// =========================================
-// 4. LABORATÓRIO DE CAOS
-// =========================================
+// LABORATÓRIO DE CAOS
 
-const PACKET_SPEED = 0.4;      
-const TIMEOUT_DURATION = 10000;
-
-let simTime = 0;               
-let isChaosMode = false;
-let isPaused = false;
-let pausedBy = null; 
-
-let packets = [];             
-let spawnQueue = [];          
-let activePackets = packets;  
-let myNextSeq = 1000;
-let burstCount = 5;
-let isBursting = false;       
-
-let unackedData = {};         
-let receivedLog = new Set();  
-let chaosLoopId = null;
-
-// Variáveis de Reordenação
-let receiverBuffer = {}; // MEU buffer (Recebendo)
-let nextExpectedSeq = 1000; 
-
-function startChaosEngine() {
-    if (chaosLoopId) return; 
-    function loop() {
-        if (isChaosMode) {
-            updatePhysics();
-            chaosLoopId = requestAnimationFrame(loop);
-        }
-    }
-    loop();
-}
-
-function updatePhysics() {
-    if (isPaused) return; 
-
-    simTime += 16; 
-
-    // 1. Spawning
-    if (spawnQueue.length > 0) {
-        if (simTime >= spawnQueue[0].spawnAfter) {
-            const next = spawnQueue.shift();
-            if (!next.id) next.id = "pkt_" + Math.random().toString(36).substr(2, 9);
-            if (spawnQueue.length > 0) spawnQueue[0].spawnAfter = simTime + 1000;
-            
-            createVisualPacket(next);
-            
-            notifyRemote("CHAOS_SPAWN", { 
-                id: next.id,       
-                seq: next.seq, 
-                type: next.type, 
-                isCorrupted: next.isCorrupted 
-            });
-
-            if (next.type === "DATA" && next.fromMe) {
-                unackedData[next.seq] = { sentTime: simTime, attempts: 0, id: next.id };
-            }
-        }
-    }
-
-    // 2. Movimento
-    for (let i = packets.length - 1; i >= 0; i--) {
-        const p = packets[i];
-        
-        // Se estiver no buffer, ignora física de movimento
-        if (p.isBuffered) continue;
-
-        if (p.fromMe) {
-            p.x += PACKET_SPEED;
-            if (p.x >= 96) handleArrival(p, i); 
-        } else {
-            p.x -= PACKET_SPEED;
-            if (p.x <= 4) handleArrival(p, i);  
-        }
-
-        if (p.el) p.el.style.left = p.x + "%";
-    }
-
-    // 3. Unlock do Botão
-    if (isBursting && spawnQueue.length === 0) {
-        isBursting = false;
-        updateFireButtonState();
-    }
-
-    checkRetransmissions();
-    updateFireButtonState();
-}
-
-// --- Funções de Controle (Juiz com Buffer) ---
-// --- Funções de Controle (Juiz com Buffer Corrigido) ---
-
-function handleArrival(p, index) {
-    if (packets.includes(p)) packets.splice(index, 1);
-    
-    // Se saiu de mim, apenas remove visualmente
-    if (p.fromMe) { if(p.el) p.el.remove(); return; }
-
-    // 1. Trata ACK
-    if (p.type === "ACK") {
-        if(p.el) p.el.remove();
-        if (unackedData[p.seq]) {
-            logChaos(`TX: ACK ${p.seq} recebido.`, "ack");
-            delete unackedData[p.seq]; 
-            updateFireButtonState(); 
-        }
-        return;
-    }
-
-    // 2. Trata Corrupção
-    if (p.isCorrupted) {
-        if(p.el) p.el.remove();
-        logChaos(`RX: SEQ ${p.seq} CORROMPIDO! Descartando.`, "error");
-        triggerNodeFlash(true, true); 
-        return; 
-    }
-
-    // 3. Trata Duplicidade
-    if (receivedLog.has(p.seq)) {
-        if(p.el) p.el.remove();
-        logChaos(`RX: SEQ ${p.seq} Duplicado. Reenviando ACK.`, "warn");
-        sendAck(p.seq); 
-        return;
-    }
-
-    // [BUFFER LÓGICA] 
-    
-    // CASO A: Pacote Esperado
-    if (p.seq === nextExpectedSeq) {
-        processValidPacket(p);
-        
-        // Verifica o buffer (Loop)
-        while (receiverBuffer[nextExpectedSeq]) {
-            const bufferedPkt = receiverBuffer[nextExpectedSeq];
-            delete receiverBuffer[nextExpectedSeq];
-            
-            // O visual do buffer é recriado inteiramente pelo renderBuffer, 
-            // então não precisamos remover elemento individual aqui.
-            
-            logChaos(`BUFFER: Retirando SEQ ${bufferedPkt.seq}.`, "recv");
-            processValidPacket(bufferedPkt);
-        }
-        
-        syncBufferWithRemote();
-
-    } 
-    // CASO B: Pacote do Futuro (Bufferizar)
-    else if (p.seq > nextExpectedSeq) {
-        logChaos(`RX: SEQ ${p.seq} fora de ordem. Bufferizando.`, "warn");
-        
-        receiverBuffer[p.seq] = p;
-        p.isBuffered = true; // Trava a física
-        
-        // [CORREÇÃO CRÍTICA]: Remove o "fantasma" do fio imediatamente
-        if (p.el) {
-            p.el.remove();
-            p.el = null; // Limpa a referência para evitar erros
-        }
-        
-        // O render vai criar a cópia visual correta dentro da caixa
-        renderBufferLocal();
-        syncBufferWithRemote();
-        
-        sendAck(p.seq); 
-    } 
-    // CASO C: Pacote Atrasado/Inútil
-    else {
-        if(p.el) p.el.remove();
-        sendAck(p.seq);
-    }
-}
-function processValidPacket(p) {
-    if(p.el) p.el.remove(); 
-    logChaos(`RX: SEQ ${p.seq} Processado.`, "recv");
-    receivedLog.add(p.seq);
-    triggerNodeFlash(true, false);
-    sendAck(p.seq);
-    nextExpectedSeq += 100; 
-}
-// --- VISUALIZADORES DE BUFFER (V44 - Ordenado e Limpo) ---
-
-// Helper para ordenar números corretamente
-function sortSeqs(keys) {
-    return keys.map(Number).sort((a, b) => a - b);
-}
-
-// 1. Renderiza MEU Buffer (Esquerda)
-function renderBufferLocal() {
-    const nodes = document.querySelectorAll(".node-icon");
-    const myNode = nodes[0];
-    const seqs = sortSeqs(Object.keys(receiverBuffer)); 
-    
-    const oldBuf = myNode.querySelector('.chaos-buffer-zone');
-    if(oldBuf) oldBuf.remove();
-
-    if(seqs.length > 0) {
-        const buf = document.createElement("div");
-        buf.className = "chaos-buffer-zone left visible";
-        
-        seqs.forEach(seq => {
-            const pkt = document.createElement("div");
-            pkt.className = "packet buffered";
-            pkt.innerText = seq;
-            buf.appendChild(pkt);
-        });
-        myNode.appendChild(buf);
-    }
-}
-
-// 2. Renderiza Buffer DELE (Direita)
-function renderBufferRemote(seqsRaw) {
-    const nodes = document.querySelectorAll(".node-icon");
-    const peerNode = nodes[1];
-    // Garante que o que veio da rede seja tratado como número e ordenado
-    const seqs = sortSeqs(seqsRaw || []);
-
-    const oldBuf = peerNode.querySelector('.chaos-buffer-zone');
-    if(oldBuf) oldBuf.remove();
-
-    if(seqs.length > 0) {
-        const buf = document.createElement("div");
-        buf.className = "chaos-buffer-zone right visible";
-        
-        seqs.forEach(seq => {
-            const pkt = document.createElement("div");
-            // Adiciona classe 'peer' para diferenciar a cor se quiser no futuro
-            pkt.className = "packet buffered peer"; 
-            pkt.innerText = seq;
-            buf.appendChild(pkt);
-        });
-        peerNode.appendChild(buf);
-    }
-}
-
-// 3. Envia dados ordenados
-function syncBufferWithRemote() {
-    const seqs = sortSeqs(Object.keys(receiverBuffer));
-    renderBufferLocal(); 
-    notifyRemote("CHAOS_BUFFER_SYNC", { seqs: seqs });
-}
-
-
-function checkRetransmissions() {
-    for (let seq in unackedData) {
-        let entry = unackedData[seq];
-        if (simTime - entry.sentTime > TIMEOUT_DURATION) {
-            if (entry.attempts >= 3) {
-                logChaos(`TX: Falha no SEQ ${seq}.`, "error");
-                delete unackedData[seq];
-                updateFireButtonState();
-                continue;
-            }
-            logChaos(`TX: Timeout ${seq}. Retransmitindo...`, "warn");
-            const retryPkt = {
-                type: "DATA", seq: parseInt(seq), fromMe: true, ownerId: myId, x: 0, isCorrupted: false,
-                id: "retry_" + Math.random().toString(36).substr(2, 9)
-            };
-            createVisualPacket(retryPkt);
-            notifyRemote("CHAOS_SPAWN", retryPkt);
-            entry.sentTime = simTime; entry.attempts++;
-        }
-    }
-}
-
-function sendAck(seq) {
-    const ackId = "ack_" + Math.random().toString(36).substr(2, 9);
-    const pkt = { id: ackId, type: "ACK", seq: seq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false };
-    createVisualPacket(pkt);
-    notifyRemote("CHAOS_SPAWN", pkt);
-}
-
-function createVisualPacket(data) {
-    const el = document.createElement("div");
-    el.className = `packet ${data.type}`;
-    if (data.ownerId !== myId) el.classList.add("peer"); 
-    if (data.isCorrupted) el.classList.add("corrupted");
-    
-    el.innerText = data.type === "ACK" ? "ACK" : data.seq;
-    el.style.transition = "none"; 
-    
-    chaosPacketLayer.appendChild(el);
-    packets.push({ ...data, el: el });
-}
-
-function dispararRajada() {
-    if(isPaused || isBursting || Object.keys(unackedData).length > 0) return;
-    isBursting = true;
-    updateFireButtonState();
-    logChaos(`TX: Rajada de ${burstCount} iniciada.`, "system");
-    for (let i = 0; i < burstCount; i++) {
-        spawnQueue.push({ type: "DATA", seq: myNextSeq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false, spawnAfter: simTime });
-        myNextSeq += 100;
-    }
-}
-
+// Solicita ativação/desativação do modo caos
 function requestToggleChaos() { if (isChaosMode) toggleChaosMode(false, true); else toggleChaosMode(true, true); }
 
+// Executa a troca de modo e sincroniza com o par
 function toggleChaosMode(ativar, emitirAviso) {
     if (isChaosMode === ativar) return;
     isChaosMode = ativar;
@@ -537,6 +283,7 @@ function toggleChaosMode(ativar, emitirAviso) {
     if (emitirAviso && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "CHAOS_SYNC", action: isChaosMode ? "OPEN" : "CLOSE", original_sender_id: myId }));
 }
 
+// Inicializa variáveis e interface do laboratório
 function openChaosLab(notify) {
     isChaosMode = true;
     simTime = 0;
@@ -560,6 +307,7 @@ function openChaosLab(notify) {
     startChaosEngine(); 
 }
 
+// Encerra o laboratório e limpa o loop
 function closeChaosLab(notify) {
     isChaosMode = false;
     chaosScreen.style.display = "none";
@@ -568,8 +316,286 @@ function closeChaosLab(notify) {
     chaosLoopId = null;
 }
 
-function notifyRemote(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, original_sender_id: myId, payload: payload })); }
+// LABORATÓRIO DE CAOS - MOTOR E FÍSICA
 
+
+// Loop principal de animação 
+function startChaosEngine() {
+    if (chaosLoopId) return; 
+    function loop() {
+        if (isChaosMode) {
+            updatePhysics();
+            chaosLoopId = requestAnimationFrame(loop);
+        }
+    }
+    loop();
+}
+
+// Atualiza posições, gerencia spawn de rajadas e tempo
+function updatePhysics() {
+    if (isPaused) return; 
+
+    simTime += 16; 
+
+    // Geração de Pacotes
+    if (spawnQueue.length > 0) {
+        if (simTime >= spawnQueue[0].spawnAfter) {
+            const next = spawnQueue.shift();
+            if (!next.id) next.id = "pkt_" + Math.random().toString(36).substr(2, 9);
+            if (spawnQueue.length > 0) spawnQueue[0].spawnAfter = simTime + 1000;
+            
+            createVisualPacket(next);
+            
+            notifyRemote("CHAOS_SPAWN", { 
+                id: next.id,       
+                seq: next.seq, 
+                type: next.type, 
+                isCorrupted: next.isCorrupted 
+            });
+
+            if (next.type === "DATA" && next.fromMe) {
+                unackedData[next.seq] = { sentTime: simTime, attempts: 0, id: next.id };
+            }
+        }
+    }
+
+    // Movimento dos Pacotes
+    for (let i = packets.length - 1; i >= 0; i--) {
+        const p = packets[i];
+        
+        // Se estiver no buffer, ignora física de movimento
+        if (p.isBuffered) continue;
+
+        if (p.fromMe) {
+            p.x += PACKET_SPEED;
+            if (p.x >= 96) handleArrival(p, i); 
+        } else {
+            p.x -= PACKET_SPEED;
+            if (p.x <= 4) handleArrival(p, i);  
+        }
+
+        if (p.el) p.el.style.left = p.x + "%";
+    }
+
+    // Atualização de Estado de UI (Botão)
+    if (isBursting && spawnQueue.length === 0) {
+        isBursting = false;
+        updateFireButtonState();
+    }
+
+    checkRetransmissions();
+    updateFireButtonState();
+}
+
+// Cria elementos visuais para pacotes do modo caos
+function createVisualPacket(data) {
+    const el = document.createElement("div");
+    el.className = `packet ${data.type}`;
+    if (data.ownerId !== myId) el.classList.add("peer"); 
+    if (data.isCorrupted) el.classList.add("corrupted");
+    
+    el.innerText = data.type === "ACK" ? "ACK" : data.seq;
+    el.style.transition = "none"; 
+    
+    chaosPacketLayer.appendChild(el);
+    packets.push({ ...data, el: el });
+}
+
+// LABORATÓRIO DE CAOS - LÓGICA DO PROTOCOLO 
+
+// Processa a chegada de pacotes: Validação, Buffer, Descarte e ACKs
+function handleArrival(p, index) {
+    if (packets.includes(p)) packets.splice(index, 1);
+    
+    // Se saiu de mim, apenas remove visualmente
+    if (p.fromMe) { if(p.el) p.el.remove(); return; }
+
+    // Trata ACK
+    if (p.type === "ACK") {
+        if(p.el) p.el.remove();
+        if (unackedData[p.seq]) {
+            logChaos(`TX: ACK ${p.seq} recebido.`, "ack");
+            delete unackedData[p.seq]; 
+            updateFireButtonState(); 
+        }
+        return;
+    }
+
+    // Trata Corrupção
+    if (p.isCorrupted) {
+        if(p.el) p.el.remove();
+        logChaos(`RX: SEQ ${p.seq} CORROMPIDO! Descartando.`, "error");
+        triggerNodeFlash(true, true); 
+        return; 
+    }
+
+    // Trata Duplicidade
+    if (receivedLog.has(p.seq)) {
+        if(p.el) p.el.remove();
+        logChaos(`RX: SEQ ${p.seq} Duplicado. Reenviando ACK.`, "warn");
+        sendAck(p.seq); 
+        return;
+    }
+
+    // BUFFER LÓGICA]
+    
+    // CASO A: Pacote Esperado
+    if (p.seq === nextExpectedSeq) {
+        processValidPacket(p);
+        
+        // Verifica o buffer (Loop)
+        while (receiverBuffer[nextExpectedSeq]) {
+            const bufferedPkt = receiverBuffer[nextExpectedSeq];
+            delete receiverBuffer[nextExpectedSeq];
+            
+            logChaos(`BUFFER: Retirando SEQ ${bufferedPkt.seq}.`, "recv");
+            processValidPacket(bufferedPkt);
+        }
+        
+        syncBufferWithRemote();
+
+    } 
+    // CASO B: Pacote do Futuro (Bufferizar)
+    else if (p.seq > nextExpectedSeq) {
+        logChaos(`RX: SEQ ${p.seq} fora de ordem. Bufferizando.`, "warn");
+        
+        receiverBuffer[p.seq] = p;
+        p.isBuffered = true; // Trava a física
+        
+        // Remove do fio imediatamente
+        if (p.el) {
+            p.el.remove();
+            p.el = null; 
+        }
+        
+        renderBufferLocal();
+        syncBufferWithRemote();
+        
+        sendAck(p.seq); 
+    } 
+    // CASO C: Pacote Atrasado/Inútil
+    else {
+        if(p.el) p.el.remove();
+        sendAck(p.seq);
+    }
+}
+
+// Processa pacote válido e avança a janela
+function processValidPacket(p) {
+    if(p.el) p.el.remove(); 
+    logChaos(`RX: SEQ ${p.seq} Processado.`, "recv");
+    receivedLog.add(p.seq);
+    triggerNodeFlash(true, false);
+    sendAck(p.seq);
+    nextExpectedSeq += 100; 
+}
+
+// Verifica timeouts e dispara retransmissões
+function checkRetransmissions() {
+    for (let seq in unackedData) {
+        let entry = unackedData[seq];
+        if (simTime - entry.sentTime > TIMEOUT_DURATION) {
+            if (entry.attempts >= 3) {
+                logChaos(`TX: Falha no SEQ ${seq}.`, "error");
+                delete unackedData[seq];
+                updateFireButtonState();
+                continue;
+            }
+            logChaos(`TX: Timeout ${seq}. Retransmitindo...`, "warn");
+            const retryPkt = {
+                type: "DATA", seq: parseInt(seq), fromMe: true, ownerId: myId, x: 0, isCorrupted: false,
+                id: "retry_" + Math.random().toString(36).substr(2, 9)
+            };
+            createVisualPacket(retryPkt);
+            notifyRemote("CHAOS_SPAWN", retryPkt);
+            entry.sentTime = simTime; entry.attempts++;
+        }
+    }
+}
+
+// Cria e envia ACK
+function sendAck(seq) {
+    const ackId = "ack_" + Math.random().toString(36).substr(2, 9);
+    const pkt = { id: ackId, type: "ACK", seq: seq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false };
+    createVisualPacket(pkt);
+    notifyRemote("CHAOS_SPAWN", pkt);
+}
+
+// Inicia rajada de pacotes
+function dispararRajada() {
+    if(isPaused || isBursting || Object.keys(unackedData).length > 0) return;
+    isBursting = true;
+    updateFireButtonState();
+    logChaos(`TX: Rajada de ${burstCount} iniciada.`, "system");
+    for (let i = 0; i < burstCount; i++) {
+        spawnQueue.push({ type: "DATA", seq: myNextSeq, fromMe: true, ownerId: myId, x: 0, isCorrupted: false, spawnAfter: simTime });
+        myNextSeq += 100;
+    }
+}
+
+// LABORATÓRIO DE CAOS - BUFFER VISUAL
+
+// Helper para ordenação
+function sortSeqs(keys) {
+    return keys.map(Number).sort((a, b) => a - b);
+}
+
+// Renderiza buffer local (Esquerda)
+function renderBufferLocal() {
+    const nodes = document.querySelectorAll(".node-icon");
+    const myNode = nodes[0];
+    const seqs = sortSeqs(Object.keys(receiverBuffer)); 
+    
+    const oldBuf = myNode.querySelector('.chaos-buffer-zone');
+    if(oldBuf) oldBuf.remove();
+
+    if(seqs.length > 0) {
+        const buf = document.createElement("div");
+        buf.className = "chaos-buffer-zone left visible";
+        
+        seqs.forEach(seq => {
+            const pkt = document.createElement("div");
+            pkt.className = "packet buffered";
+            pkt.innerText = seq;
+            buf.appendChild(pkt);
+        });
+        myNode.appendChild(buf);
+    }
+}
+
+// Renderiza buffer remoto (Direita)
+function renderBufferRemote(seqsRaw) {
+    const nodes = document.querySelectorAll(".node-icon");
+    const peerNode = nodes[1];
+    const seqs = sortSeqs(seqsRaw || []);
+
+    const oldBuf = peerNode.querySelector('.chaos-buffer-zone');
+    if(oldBuf) oldBuf.remove();
+
+    if(seqs.length > 0) {
+        const buf = document.createElement("div");
+        buf.className = "chaos-buffer-zone right visible";
+        
+        seqs.forEach(seq => {
+            const pkt = document.createElement("div");
+            pkt.className = "packet buffered peer"; 
+            pkt.innerText = seq;
+            buf.appendChild(pkt);
+        });
+        peerNode.appendChild(buf);
+    }
+}
+
+// Sincroniza buffer com parceiro
+function syncBufferWithRemote() {
+    const seqs = sortSeqs(Object.keys(receiverBuffer));
+    renderBufferLocal(); 
+    notifyRemote("CHAOS_BUFFER_SYNC", { seqs: seqs });
+}
+
+// LABORATÓRIO DE CAOS - PAUSA E EDIÇÃO
+
+// Solicita pausa
 function requestPauseToggle() {
     if (isPaused && pausedBy !== myId) return;
     const novoEstado = !isPaused;
@@ -577,6 +603,7 @@ function requestPauseToggle() {
     aplicarPausa(novoEstado, myId);
 }
 
+// Aplica estado de pausa na UI
 function aplicarPausa(estado, quemPausou) {
     isPaused = estado;
     pausedBy = quemPausou;
@@ -598,6 +625,7 @@ function aplicarPausa(estado, quemPausou) {
     }
 }
 
+// Renderiza lista de edição
 function renderEditor() {
     activePacketList.innerHTML = "";
     const dataPackets = packets.filter(p => p.type === "DATA");
@@ -621,6 +649,7 @@ function renderEditor() {
     });
 }
 
+// Aplica edição local
 function editPacket(action, idx, param) {
     if (!packets[idx] || packets[idx].ownerId !== myId) return;
     const p = packets[idx];
@@ -640,6 +669,7 @@ function editPacket(action, idx, param) {
     renderEditor();
 }
 
+// Aplica edição remota
 function aplicarEdicaoRemota(data) {
     let idx = packets.findIndex(p => p.id === data.id);
     if (idx === -1 && data.action !== 'swap') { if (packets[data.idx1]) idx = data.idx1; else return; }
@@ -659,6 +689,9 @@ function aplicarEdicaoRemota(data) {
     if(isPaused) renderEditor();
 }
 
+// UTILITÁRIOS DE INTERFACE E LOGS
+
+// Flash visual no nó
 function triggerNodeFlash(isReverse, isCorrupted) {
     const idx = isReverse ? 0 : 1; const node = chaosNodes[idx];
     if(node) {
@@ -667,6 +700,7 @@ function triggerNodeFlash(isReverse, isCorrupted) {
     }
 }
 
+// Atualiza estado do botão de disparo
 function updateFireButtonState() {
     let btn = document.getElementById("btn-fire-burst");
     if(!btn) btn = document.getElementById("btn-fire");
@@ -680,13 +714,14 @@ function updateFireButtonState() {
     else { btn.disabled = false; btn.innerText = "DISPARAR"; btn.style.cursor = "pointer"; }
 }
 
+// Seleciona quantidade de pacotes
 function mudarQtdRajada(n, btn) {
     burstCount = n;
     document.querySelectorAll(".btn-opt").forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
 }
 
-// CORREÇÃO CRÍTICA: FUNÇÃO DE LOG DE VOLTA
+// Log do sistema
 function logChaos(text, type="system") {
     const d = document.createElement("div");
     d.className = `log-entry ${type}`;
@@ -700,7 +735,9 @@ function logChaos(text, type="system") {
     }
 }
 
-/* --- GARANTIA DE BOTÃO --- */
+// INICIALIZAÇÃO
+
+// Binding de eventos DOM
 document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("btn-fire-burst") || document.getElementById("btn-fire");
     if(btn) {
@@ -709,4 +746,5 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 window.dispararRajada = dispararRajada;
 
+// Inicia conexão WebSocket
 conectarWS();
