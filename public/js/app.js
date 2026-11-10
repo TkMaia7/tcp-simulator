@@ -88,9 +88,7 @@ if(btnOpenChaos) btnOpenChaos.disabled = true;
 // Inicia a conexão WS e define o roteamento de todas as mensagens recebidas
 function conectarWS() {
     if(displayMyPort) displayMyPort.innerText = `Porta: ${myRealPort}`;
-    const host = window.location.hostname;
-    const url = (window.location.protocol === 'https:') ? `wss://${host}/ws` : `ws://${host||"localhost"}:8000`;
-
+    const url = "wss://tcp-simulator.onrender.com/ws";
     ws = new WebSocket(url);
 
     ws.onopen = () => { lobbyMsg.innerText = "Conectado. Carregando salas..."; lobbyMsg.style.color = "#3fb950"; };
