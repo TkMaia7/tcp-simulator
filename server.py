@@ -1,6 +1,8 @@
 import asyncio
 import json
 import websockets
+import http
+import os
 
 # CONFIGURAÇÕES E GLOBAIS
 
@@ -146,13 +148,27 @@ async def handle_simulation_message(ws, data):
 # Envia mensagem de erro padronizada para o cliente
 async def send_error(ws, msg):
     await ws.send(json.dumps({"type": "ERROR", "message": msg}))
+    
+    
+# INTERCEPTAÇÃO DE HEALTH CHECKS HTTP 
+async def process_request(connection, request):
+    if request.path == "/":
+        return http.HTTPStatus.OK, [], b"OK\n"
+    return None
 
 # INICIALIZAÇÃO DO SERVIDOR
 
-# Configuração e inicialização do loop de eventos do servidor
 async def main():
-    print("=== TCP SERVER COM LOBBY AO VIVO (8000) ===")
-    async with websockets.serve(handler_wrapper, "0.0.0.0", 8000):
+    porta = int(os.environ.get("PORT", 8000))
+    
+    print(f"TCP SERVER ATIVO (PORTA {porta})")
+    
+    async with websockets.serve(
+        handler_wrapper, 
+        "0.0.0.0", 
+        porta, 
+        process_request=process_request
+    ):
         await asyncio.get_running_loop().create_future()
 
 if __name__ == "__main__":
