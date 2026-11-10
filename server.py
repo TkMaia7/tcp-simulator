@@ -150,10 +150,14 @@ async def send_error(ws, msg):
     await ws.send(json.dumps({"type": "ERROR", "message": msg}))
     
     
-# INTERCEPTAÇÃO DE HEALTH CHECKS HTTP 
+# INTERCEPTAÇÃO DE HTTP (render)
 async def process_request(connection, request):
     if request.path == "/":
-        return http.HTTPStatus.OK, [], b"OK\n"
+        headers = [
+            ("Location", "https://tkmaia7.github.io/tcp-simulator/public/index.html")
+        ]
+        return http.HTTPStatus.FOUND, headers, b"Redirecionando...\n"
+    
     return None
 
 # INICIALIZAÇÃO DO SERVIDOR
